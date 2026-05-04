@@ -1040,6 +1040,7 @@ function App() {
   const [storeName, setStoreName] = useState(TWEAK_DEFAULTS.storeName);
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
   const [rawFiles, setRawFiles] = React.useState([]);
+  const [apiKey, setApiKey] = React.useState(() => {
     const saved = localStorage.getItem('openai_api_key') || '';
     if (saved) window.OPENAI_API_KEY = saved;
     return saved;
