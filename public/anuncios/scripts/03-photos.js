@@ -25,9 +25,9 @@ function BgPlaceholder({ style = {} }) {
 function ZoomedImg({ src, zoom = 1, wrapStyle = {}, imgStyle = {} }) {
   if (!src) return <BgPlaceholder style={wrapStyle} />;
   return (
-    <div style={{ overflow: 'hidden', display: 'grid', placeItems: 'center', ...wrapStyle }}>
+    <div style={{ display: 'grid', placeItems: 'center', ...wrapStyle }}>
       <img src={src} alt="" style={{
-        maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
+        width: '100%', height: '100%', objectFit: 'contain',
         transform: `scale(${zoom})`, transformOrigin: 'center center',
         transition: 'transform .1s', ...imgStyle
       }} />
@@ -55,7 +55,7 @@ function Photo1A({ data, set, bgMode }) {
           </div>
         )}
       </Drag>
-      <Drag id="p1_main" data={data} set={set} enabled={bgMode} style={{ flex: 1, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+      <Drag id="p1_main" data={data} set={set} enabled={bgMode} style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
         <ZoomedImg src={data.mainImg} zoom={data.p1_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
       </Drag>
     </div>
@@ -99,7 +99,7 @@ function Photo1E({ data, set, bgMode }) {
   return (
     <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', overflow: 'hidden' }}>
       {/* Produto */}
-      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60 }}>
         <ZoomedImg src={data.mainImg} zoom={data.p1_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
       </div>
 
@@ -142,7 +142,7 @@ function Photo1E({ data, set, bgMode }) {
 /* ---- VARIANTE C: só o produto, sem nada sobreposto ---- */
 function Photo1C({ data, set, bgMode }) {
   return (
-    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', display: 'grid', placeItems: 'center', padding: 80, overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', display: 'grid', placeItems: 'center', padding: 80 }}>
       <ZoomedImg src={data.mainImg} zoom={data.p1_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
     </div>
   );
@@ -177,7 +177,7 @@ function Photo2({ data, set, bgMode }) {
           <Feat align="right" icon={<Ic.shield />} title={data.p2_f4_title} text={data.p2_f4_text}
           onTitle={(v) => set('p2_f4_title', v)} onText={(v) => set('p2_f4_text', v)} />
         </Drag>
-        <Drag id="p2_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+        <Drag id="p2_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
           <ZoomedImg src={data.mainImg} zoom={data.p2_zoom||1} wrapStyle={{ width: '62%', height: '72%' }} />
         </Drag>
         {!bgMode && <><Arrow d="M 22,16 C 32,28 36,36 44,46" />
@@ -264,7 +264,7 @@ function Photo3({ data, set, bgMode }) {
           onTitle={(v) => set('p3_f4_title', v)} onText={(v) => set('p3_f4_text', v)} />
         </Drag>
 
-        <Drag id="p3_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', right: 0, top: 0, width: '58%', height: '100%', overflow: 'hidden' }}>
+        <Drag id="p3_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', right: 0, top: 0, width: '58%', height: '100%' }}>
           <ZoomedImg src={data.mainImg} zoom={data.p3_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
           <DimLabel value={data.p3_dim1} onChange={(v) => set('p3_dim1', v)} style={{ top: '14%', right: 0 }} />
           <DimLabel value={data.p3_dim2} onChange={(v) => set('p3_dim2', v)} style={{ top: '40%', left: 0 }} />
@@ -380,7 +380,7 @@ function Photo5({ data, set, bgMode }) {
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <Drag id="p5_mini" data={data} set={set} enabled
           defaultPos={{ x: 750, y: 700 }}
-          style={{ position: 'absolute', top: 0, left: 0, width: data.p5_mini_size || 280, height: data.p5_mini_size || 280, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+          style={{ position: 'absolute', top: 0, left: 0, width: data.p5_mini_size || 280, height: data.p5_mini_size || 280, display: 'grid', placeItems: 'center' }}>
           <ZoomedImg src={data.mainImg} zoom={data.p5_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
         </Drag>
       </div>
@@ -415,7 +415,7 @@ function Photo5({ data, set, bgMode }) {
         <TrustRow textA={data.p5_t3_text_a} hl={data.p5_t3_hl} textB={data.p5_t3_text_b}
         onA={(v) => set('p5_t3_text_a', v)} onHl={(v) => set('p5_t3_hl', v)} onB={(v) => set('p5_t3_text_b', v)} />
 
-        <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320 }}>
           <ZoomedImg src={data.mainImg} zoom={data.p5_zoom||1} wrapStyle={{ height: data.p5_mini_size || 280, maxWidth: '85%' }} />
         </div>
       </div>
@@ -533,7 +533,7 @@ function Photo6({ data, set, bgMode }) {
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <Drag id="p6_mini" data={data} set={set} enabled
           defaultPos={{ x: 750, y: 700 }}
-          style={{ position: 'absolute', top: 0, left: 0, width: data.p6_mini_size || 280, height: data.p6_mini_size || 280, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+          style={{ position: 'absolute', top: 0, left: 0, width: data.p6_mini_size || 280, height: data.p6_mini_size || 280, display: 'grid', placeItems: 'center' }}>
           <ZoomedImg src={data.mainImg} zoom={data.p6_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
         </Drag>
       </div>
@@ -568,7 +568,7 @@ function Photo6({ data, set, bgMode }) {
         <TrustRow textA={data.p6_t3_text_a} hl={data.p6_t3_hl} textB={data.p6_t3_text_b}
         onA={(v) => set('p6_t3_text_a', v)} onHl={(v) => set('p6_t3_hl', v)} onB={(v) => set('p6_t3_text_b', v)} />
 
-        <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320 }}>
           <ZoomedImg src={data.mainImg} zoom={data.p6_zoom||1} wrapStyle={{ height: data.p6_mini_size || 280, maxWidth: '85%' }} />
         </div>
       </div>

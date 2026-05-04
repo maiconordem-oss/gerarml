@@ -527,6 +527,51 @@ function AIGenBtn({ slotNum, rawImgs, onResult, label, title, promptKeys }) {
   );
 }
 
+/* ============== Clipboard de imagem entre slots ============== */
+// clipboard global — objeto simples, não precisa de estado React
+window._imgClipboard = null;
+
+function ClipboardBar({ onCopy, onPaste, hasImg }) {
+  const [flash, setFlash] = React.useState(''); // 'copied' | 'pasted' | ''
+
+  const copy = () => {
+    onCopy();
+    setFlash('copied');
+    setTimeout(() => setFlash(''), 1800);
+  };
+  const paste = () => {
+    if (!window._imgClipboard) return;
+    onPaste(window._imgClipboard);
+    setFlash('pasted');
+    setTimeout(() => setFlash(''), 1800);
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <button
+        onClick={copy}
+        disabled={!hasImg}
+        title="Copiar imagem deste slot"
+        style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6,
+          background: flash === 'copied' ? '#dcfce7' : 'white',
+          fontSize: 11, fontWeight: 600, cursor: hasImg ? 'pointer' : 'not-allowed',
+          color: hasImg ? '#374151' : '#d1d5db', whiteSpace: 'nowrap' }}>
+        {flash === 'copied' ? '✓ Copiado' : '⎘ Copiar'}
+      </button>
+      <button
+        onClick={paste}
+        disabled={!window._imgClipboard}
+        title="Colar imagem copiada neste slot"
+        style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6,
+          background: flash === 'pasted' ? '#dbeafe' : 'white',
+          fontSize: 11, fontWeight: 600, cursor: window._imgClipboard ? 'pointer' : 'not-allowed',
+          color: window._imgClipboard ? '#374151' : '#d1d5db', whiteSpace: 'nowrap' }}>
+        {flash === 'pasted' ? '✓ Colado' : '⎘ Colar'}
+      </button>
+    </div>
+  );
+}
+
 /* ============== Barra de zoom do produto por slot ============== */
 function ZoomBar({ value, onChange }) {
   const pct = Math.round((value || 1) * 100);
@@ -534,15 +579,15 @@ function ZoomBar({ value, onChange }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f0f0', padding: '4px 8px', borderRadius: 8 }}>
       <button
-        onClick={() => onChange(Math.max(0.3, +(value - step).toFixed(2)))}
+        onClick={() => onChange(Math.max(0.1, +(value - step).toFixed(2)))}
         style={{ width: 28, height: 28, border: 0, borderRadius: 6, background: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#444', boxShadow: '0 1px 2px rgba(0,0,0,.08)' }}>−</button>
       <input
-        type="range" min="30" max="200" step="5" value={pct}
+        type="range" min="10" max="400" step="5" value={pct}
         onChange={e => onChange(+(+e.target.value / 100).toFixed(2))}
         style={{ width: 80, accentColor: '#1F7A3A' }}
       />
       <button
-        onClick={() => onChange(Math.min(2, +(value + step).toFixed(2)))}
+        onClick={() => onChange(Math.min(4, +(value + step).toFixed(2)))}
         style={{ width: 28, height: 28, border: 0, borderRadius: 6, background: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#444', boxShadow: '0 1px 2px rgba(0,0,0,.08)' }}>+</button>
       <span style={{ fontSize: 11, fontWeight: 700, color: '#666', minWidth: 34, textAlign: 'right' }}>{pct}%</span>
       {pct !== 100 && (
@@ -1085,6 +1130,9 @@ function App() {
             <VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>
             <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
               <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
+              <ClipboardBar hasImg={!!data.mainImg}
+                onCopy={() => { window._imgClipboard = data.mainImg; }}
+                onPaste={(img) => set('mainImg', img)}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
                 label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"
                 promptKeys={[1]}/>
@@ -1096,6 +1144,9 @@ function App() {
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
+            <ClipboardBar hasImg={!!data.mainImg}
+              onCopy={() => { window._imgClipboard = data.mainImg; }}
+              onPaste={(img) => set('mainImg', img)}/>
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
               label="Gerar 2 closes" title="Gera 2 closes do produto para os círculos de detalhe"
               promptKeys={['2a','2b']}/>
@@ -1106,6 +1157,9 @@ function App() {
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
+            <ClipboardBar hasImg={!!data.mainImg}
+              onCopy={() => { window._imgClipboard = data.mainImg; }}
+              onPaste={(img) => set('mainImg', img)}/>
             <AIGenBtn slotNum={3} rawImgs={rawFiles} onResult={merge}
               label="Gerar hero + 2 closes" title="Gera foto hero + 2 closes para essa foto"
               promptKeys={[3,'2a','2b']}/>
@@ -1116,6 +1170,9 @@ function App() {
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
+            <ClipboardBar hasImg={!!data.mainImg}
+              onCopy={() => { window._imgClipboard = data.mainImg; }}
+              onPaste={(img) => set('mainImg', img)}/>
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
               label="Gerar lifestyle" title="Gera foto do produto em uso para lifestyle"
               promptKeys={[4]}/>
@@ -1126,7 +1183,9 @@ function App() {
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>
-            <span style={{fontSize:11, color:'#6b7280'}}>Usa a foto da Foto 1 como miniatura</span>
+            <ClipboardBar hasImg={!!data.mainImg}
+              onCopy={() => { window._imgClipboard = data.mainImg; }}
+              onPaste={(img) => set('mainImg', img)}/>
           </div>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
@@ -1134,7 +1193,9 @@ function App() {
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>
-            <span style={{fontSize:11, color:'#6b7280'}}>Usa a foto da Foto 1 como miniatura</span>
+            <ClipboardBar hasImg={!!data.mainImg}
+              onCopy={() => { window._imgClipboard = data.mainImg; }}
+              onPaste={(img) => set('mainImg', img)}/>
           </div>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
