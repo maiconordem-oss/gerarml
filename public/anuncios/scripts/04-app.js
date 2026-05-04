@@ -110,21 +110,229 @@ const INITIAL = {
 /* =============================================================
    AUTO-GENERATE: dado N fotos, gera os crops para os 5 templates
    ============================================================= */
-async function autoGenerate(uploadedDataUrls) {
+// ---------------------------------------------------------------------------
+// ANÁLISE VISION — 1 chamada gpt-4o-mini, ~$0.005
+// Detecta: cor do fundo, posição do produto, categoria
+// ---------------------------------------------------------------------------
+async function analyzeProductVision(dataUrl) {
+  const key = (window.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || '').trim();
+  if (!key) return null; // sem chave, usa fallback local
+
+  // Reduz para 512px para economizar tokens
+  const small = await resizeDataUrl(dataUrl, 512);
+  const b64 = small.split(',')[1];
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'low' } },
+            { type: 'text', text: 'Analise esta foto de produto e responda SOMENTE com JSON (sem markdown): {"bg_r":N,"bg_g":N,"bg_b":N,"tolerance":N,"product_x_pct":N,"product_y_pct":N,"product_w_pct":N,"product_h_pct":N,"category":"string"} onde bg_r/g/b é a cor RGB do fundo (não do produto), tolerance é 20-60, product_x/y/w/h_pct são a posição e tamanho do produto em % da imagem (0-100), category é uma palavra em português (ex: ferramentas, eletrônicos, beleza).' }
+          ]
+        }]
+      })
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const txt = data.choices[0].message.content;
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+  } catch (_) {}
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// REMOÇÃO DE FUNDO LOCAL — usa cor detectada pelo Vision (ou auto-detecta)
+// ---------------------------------------------------------------------------
+async function removeBgLocal(dataUrl, bgColor) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const id = ctx.getImageData(0, 0, c.width, c.height);
+      const d = id.data;
+      const { bg_r = 240, bg_g = 240, bg_b = 240, tolerance = 35 } = bgColor || {};
+      const feather = 18;
+      for (let i = 0; i < d.length; i += 4) {
+        const dr = d[i] - bg_r, dg = d[i+1] - bg_g, db = d[i+2] - bg_b;
+        const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+        if (dist < tolerance) { d[i+3] = 0; }
+        else if (dist < tolerance + feather) { d[i+3] = Math.round(d[i+3] * (dist - tolerance) / feather); }
+      }
+      ctx.putImageData(id, 0, 0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// COMPOSIÇÃO EM CANVAS — produto sem fundo + fundo branco profissional
+// Adiciona sombra suave embaixo do produto
+// ---------------------------------------------------------------------------
+async function composeOnWhite(noBgDataUrl, sizePx = 1200) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = sizePx; c.height = sizePx;
+      const ctx = c.getContext('2d');
+
+      // Fundo branco puro
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sizePx, sizePx);
+
+      // Calcula posição centralizada com padding de 10%
+      const pad = sizePx * 0.10;
+      const maxW = sizePx - pad * 2;
+      const maxH = sizePx - pad * 2;
+      const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (sizePx - dw) / 2;
+      const dy = (sizePx - dh) / 2;
+
+      // Sombra suave no chão
+      const shadowY = dy + dh;
+      const grad = ctx.createRadialGradient(sizePx/2, shadowY, 0, sizePx/2, shadowY, dw * 0.5);
+      grad.addColorStop(0, 'rgba(0,0,0,0.12)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.ellipse(sizePx/2, shadowY, dw * 0.45, dw * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Produto
+      ctx.drawImage(img, dx, dy, dw, dh);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(noBgDataUrl);
+    img.src = noBgDataUrl;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// RESIZE helper
+// ---------------------------------------------------------------------------
+function resizeDataUrl(dataUrl, maxPx) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', 0.88));
+    };
+    img.src = dataUrl;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AUTO-GENERATE — fluxo completo local (~$0.005 total)
+// ---------------------------------------------------------------------------
+async function autoGenerate(uploadedDataUrls, onProgress) {
   const out = {};
   if (!uploadedDataUrls.length) return out;
-  out.mainImg = uploadedDataUrls[0];
-  if (uploadedDataUrls.length >= 3) {
-    out.p5_lifestyle = uploadedDataUrls[2];
-    out.p6_lifestyle = uploadedDataUrls[2];
-  } else if (uploadedDataUrls.length >= 2) {
+  const src = uploadedDataUrls[0];
+
+  onProgress && onProgress('🔍 Analisando produto...');
+
+  // 1. Vision analisa a foto (1 chamada barata)
+  const vision = await analyzeProductVision(src);
+
+  onProgress && onProgress('✂️ Removendo fundo...');
+
+  // 2. Remove fundo localmente usando cor detectada
+  const noBg = await removeBgLocal(src, vision);
+
+  onProgress && onProgress('🎨 Compondo imagens...');
+
+  // 3. Compõe produto em fundo branco — usada nas fotos 1, 2, 3, 5, 6
+  const hero = await composeOnWhite(noBg, 1200);
+  out.mainImg = hero;
+
+  // 4. Crops de detalhe inteligentes (centrados no produto detectado)
+  const crops = await makeCircleCropsFromBounds(src, vision);
+  out.p1_circles = crops.map(img => ({ img }));
+  out.p1e_spot = { img: crops[0] || '', x: 58, y: 55, size: 340 };
+
+  // 5. Lifestyle: usa 2ª foto se disponível, senão a própria foto original
+  if (uploadedDataUrls.length >= 2) {
     out.p5_lifestyle = uploadedDataUrls[1];
     out.p6_lifestyle = uploadedDataUrls[1];
+  } else {
+    out.p5_lifestyle = src;
+    out.p6_lifestyle = src;
   }
-  const crops = await makeCircleCrops(uploadedDataUrls[0]);
-  out.p1_circles = crops.map(img => ({ img }));
-  if (uploadedDataUrls.length >= 2) out.p1_corner4 = uploadedDataUrls[1];
+
+  // 6. 4º canto variante C: usa 3ª foto ou crop central
+  out.p1_corner4 = uploadedDataUrls[2] || crops[1] || hero;
+
+  onProgress && onProgress('✅ Pronto!');
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// CROPS INTELIGENTES usando bounds do Vision
+// ---------------------------------------------------------------------------
+function makeCircleCropsFromBounds(dataUrl, vision) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight;
+
+      // Usa bounds do Vision se disponível, senão detecta localmente
+      let bx, by, bw, bh;
+      if (vision && vision.product_w_pct > 5) {
+        bx = (vision.product_x_pct / 100) * W;
+        by = (vision.product_y_pct / 100) * H;
+        bw = (vision.product_w_pct / 100) * W;
+        bh = (vision.product_h_pct / 100) * H;
+      } else {
+        const bounds = detectProductBounds(img);
+        bx = bounds.x; by = bounds.y; bw = bounds.w; bh = bounds.h;
+      }
+
+      const cx = bx + bw / 2;
+      const cy = by + bh / 2;
+      const cropSize = Math.min(bw, bh) * 0.55;
+
+      const regions = [
+        { cx: cx - bw * 0.15, cy: cy - bh * 0.2  }, // detalhe superior
+        { cx: cx,              cy: cy              }, // centro
+        { cx: cx + bw * 0.15, cy: cy + bh * 0.2  }, // detalhe inferior
+      ];
+
+      const crops = regions.map(r => {
+        const out = document.createElement('canvas');
+        out.width = 600; out.height = 600;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 600, 600);
+        const half = cropSize / 2;
+        ctx.drawImage(img, r.cx - half, r.cy - half, cropSize, cropSize, 0, 0, 600, 600);
+        return out.toDataURL('image/png');
+      });
+      resolve(crops);
+    };
+    img.onerror = () => resolve(['', '', '']);
+    img.src = dataUrl;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -727,18 +935,29 @@ function UploadZone({ onGenerate, productName, setProductName, onRawFiles }) {
       const merged = [...files, ...urls].slice(0, 5);
       setFiles(merged);
       if (onRawFiles) onRawFiles(merged);
-      // Aplica imagens direto, sem precisar clicar em nada
-      const imgPatch = await autoGenerate(merged);
-      if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
+      // Gera automaticamente com progresso
+      setAiStatus('🔍 Analisando produto...');
+      try {
+        const imgPatch = await autoGenerate(merged, (msg) => setAiStatus(msg));
+        if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
+        setAiStatus('');
+      } catch(e) {
+        setAiStatus('⚠️ ' + e.message);
+        setTimeout(() => setAiStatus(''), 4000);
+      }
     });
   };
 
   const removeFile = (i) => {
     const next = files.filter((_, j) => j !== i);
     setFiles(next);
-    // Reaplicar com as fotos restantes
-    if (next.length > 0) autoGenerate(next).then(patch => onGenerate(patch));
     if (onRawFiles) onRawFiles(next);
+    if (next.length > 0) {
+      setAiStatus('🔄 Atualizando...');
+      autoGenerate(next, (msg) => setAiStatus(msg))
+        .then(patch => { onGenerate(patch); setAiStatus(''); })
+        .catch(() => setAiStatus(''));
+    }
   };
 
   const runAI = async () => {
@@ -789,10 +1008,18 @@ function UploadZone({ onGenerate, productName, setProductName, onRawFiles }) {
             <div key={i} className="drop-thumb" style={{backgroundImage: `url(${url})`}}>
               <button className="drop-thumb-rm" onClick={(e) => { e.stopPropagation(); removeFile(i); }}>×</button>
               <div style={{position:'absolute', bottom:4, left:4, background:'rgba(0,0,0,.7)', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, fontWeight:600}}>
-                {i === 0 ? 'principal' : i === 2 ? 'lifestyle' : `extra ${i}`}
+                {i === 0 ? 'principal' : i === 1 ? 'lifestyle' : `extra ${i}`}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Status de geração automática */}
+      {aiStatus && (
+        <div style={{marginTop:10, padding:'10px 14px', background:'#f0fdf9', border:'1px solid #6ee7b7', borderRadius:8, fontSize:13, fontWeight:500, color:'#065f46', display:'flex', alignItems:'center', gap:10}}>
+          <span style={{animation:'spin 1s linear infinite', display:'inline-block', fontSize:16}}>⟳</span>
+          {aiStatus}
         </div>
       )}
 
