@@ -59,19 +59,30 @@ function E({ value, onChange, className, style, multi }) {
 
 /* =============== EXPORT TO PNG =============== */
 async function exportCanvas(node, filename) {
-  // Use html-to-image via dom-to-image-more lite — fall back to canvas screenshot
   if (!window.htmlToImage) {
     alert('Carregando biblioteca de export... aguarde 1s e tente de novo.');
     return;
   }
   try {
+    // Temporariamente reseta o scale do canvas para capturar em tamanho real
+    const prevTransform = node.style.transform;
+    const prevPosition = node.style.position;
+    node.style.transform = 'scale(1)';
+    node.style.transformOrigin = 'top left';
+
     const dataUrl = await window.htmlToImage.toPng(node, {
       width: 1200,
       height: 1540,
       pixelRatio: 1,
       cacheBust: true,
-      style: { transform: 'none' },
+      skipFonts: false,
+      includeQueryParams: true,
     });
+
+    // Restaura o scale visual
+    node.style.transform = prevTransform;
+    node.style.position = prevPosition;
+
     const a = document.createElement('a');
     a.href = dataUrl;
     a.download = filename;

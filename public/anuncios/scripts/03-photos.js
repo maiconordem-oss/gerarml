@@ -24,12 +24,16 @@ function BgPlaceholder({ style = {} }) {
 /* Imagem do produto com zoom — wrapStyle controla o container, zoom aplica scale */
 function ZoomedImg({ src, zoom = 1, wrapStyle = {}, imgStyle = {} }) {
   if (!src) return <BgPlaceholder style={wrapStyle} />;
+  const pct = `${Math.round(zoom * 100)}%`;
   return (
-    <div style={{ display: 'grid', placeItems: 'center', ...wrapStyle }}>
+    <div style={{ display: 'grid', placeItems: 'center', overflow: 'visible', ...wrapStyle }}>
       <img src={src} alt="" style={{
-        width: '100%', height: '100%', objectFit: 'contain',
-        transform: `scale(${zoom})`, transformOrigin: 'center center',
-        transition: 'transform .1s', ...imgStyle
+        width: pct,
+        height: pct,
+        objectFit: 'contain',
+        display: 'block',
+        transition: 'width .1s, height .1s',
+        ...imgStyle
       }} />
     </div>
   );
