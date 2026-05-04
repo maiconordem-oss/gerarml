@@ -110,223 +110,21 @@ const INITIAL = {
 /* =============================================================
    AUTO-GENERATE: dado N fotos, gera os crops para os 5 templates
    ============================================================= */
-// ---------------------------------------------------------------------------
-// ANÁLISE VISION — 1 chamada gpt-4o-mini, ~$0.005
-// Detecta: cor do fundo, posição do produto, categoria
-// ---------------------------------------------------------------------------
-async function analyzeProductVision(dataUrl) {
-  const key = (window.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || '').trim();
-  if (!key) return null; // sem chave, usa fallback local
-
-  // Reduz para 512px para economizar tokens
-  const small = await resizeDataUrl(dataUrl, 512);
-  const b64 = small.split(',')[1];
-
-  try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 150,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'low' } },
-            { type: 'text', text: 'Analise esta foto de produto e responda SOMENTE com JSON (sem markdown): {"bg_r":N,"bg_g":N,"bg_b":N,"tolerance":N,"product_x_pct":N,"product_y_pct":N,"product_w_pct":N,"product_h_pct":N,"category":"string"} onde bg_r/g/b é a cor RGB do fundo (não do produto), tolerance é 20-60, product_x/y/w/h_pct são a posição e tamanho do produto em % da imagem (0-100), category é uma palavra em português (ex: ferramentas, eletrônicos, beleza).' }
-          ]
-        }]
-      })
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const txt = data.choices[0].message.content;
-    const m = txt.match(/\{[\s\S]*\}/);
-    if (m) return JSON.parse(m[0]);
-  } catch (_) {}
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// REMOÇÃO DE FUNDO LOCAL — usa cor detectada pelo Vision (ou auto-detecta)
-// ---------------------------------------------------------------------------
-async function removeBgLocal(dataUrl, bgColor) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.naturalWidth; c.height = img.naturalHeight;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const id = ctx.getImageData(0, 0, c.width, c.height);
-      const d = id.data;
-      const { bg_r = 240, bg_g = 240, bg_b = 240, tolerance = 35 } = bgColor || {};
-      const feather = 18;
-      for (let i = 0; i < d.length; i += 4) {
-        const dr = d[i] - bg_r, dg = d[i+1] - bg_g, db = d[i+2] - bg_b;
-        const dist = Math.sqrt(dr*dr + dg*dg + db*db);
-        if (dist < tolerance) { d[i+3] = 0; }
-        else if (dist < tolerance + feather) { d[i+3] = Math.round(d[i+3] * (dist - tolerance) / feather); }
-      }
-      ctx.putImageData(id, 0, 0);
-      resolve(c.toDataURL('image/png'));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// COMPOSIÇÃO EM CANVAS — produto sem fundo + fundo branco profissional
-// Adiciona sombra suave embaixo do produto
-// ---------------------------------------------------------------------------
-async function composeOnWhite(noBgDataUrl, sizePx = 1200) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = sizePx; c.height = sizePx;
-      const ctx = c.getContext('2d');
-
-      // Fundo branco puro
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, sizePx, sizePx);
-
-      // Calcula posição centralizada com padding de 10%
-      const pad = sizePx * 0.10;
-      const maxW = sizePx - pad * 2;
-      const maxH = sizePx - pad * 2;
-      const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
-      const dx = (sizePx - dw) / 2;
-      const dy = (sizePx - dh) / 2;
-
-      // Sombra suave no chão
-      const shadowY = dy + dh;
-      const grad = ctx.createRadialGradient(sizePx/2, shadowY, 0, sizePx/2, shadowY, dw * 0.5);
-      grad.addColorStop(0, 'rgba(0,0,0,0.12)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
-      ctx.ellipse(sizePx/2, shadowY, dw * 0.45, dw * 0.06, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Produto
-      ctx.drawImage(img, dx, dy, dw, dh);
-      resolve(c.toDataURL('image/png'));
-    };
-    img.onerror = () => resolve(noBgDataUrl);
-    img.src = noBgDataUrl;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// RESIZE helper
-// ---------------------------------------------------------------------------
-function resizeDataUrl(dataUrl, maxPx) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale);
-      const h = Math.round(img.naturalHeight * scale);
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(c.toDataURL('image/jpeg', 0.88));
-    };
-    img.src = dataUrl;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// AUTO-GENERATE — distribui fotos nos slots sem processamento
-// Processamento de fundo é opcional via botões por slot
-// ---------------------------------------------------------------------------
-async function autoGenerate(uploadedDataUrls, onProgress) {
+async function autoGenerate(uploadedDataUrls) {
   const out = {};
   if (!uploadedDataUrls.length) return out;
-
-  onProgress && onProgress('📸 Distribuindo fotos...');
-
-  // Foto principal
   out.mainImg = uploadedDataUrls[0];
-
-  // Lifestyle (fotos 5/6)
   if (uploadedDataUrls.length >= 3) {
     out.p5_lifestyle = uploadedDataUrls[2];
     out.p6_lifestyle = uploadedDataUrls[2];
   } else if (uploadedDataUrls.length >= 2) {
     out.p5_lifestyle = uploadedDataUrls[1];
     out.p6_lifestyle = uploadedDataUrls[1];
-  } else {
-    out.p5_lifestyle = uploadedDataUrls[0];
-    out.p6_lifestyle = uploadedDataUrls[0];
   }
-
-  onProgress && onProgress('✂️ Gerando crops de detalhe...');
-
-  // Crops inteligentes para os círculos da capa
-  const crops = await makeCircleCropsFromBounds(uploadedDataUrls[0], null);
+  const crops = await makeCircleCrops(uploadedDataUrls[0]);
   out.p1_circles = crops.map(img => ({ img }));
-  out.p1e_spot = { img: crops[0] || '', x: 58, y: 55, size: 340 };
-
-  // 4º canto variante C
-  out.p1_corner4 = uploadedDataUrls[2] || uploadedDataUrls[1] || crops[1] || uploadedDataUrls[0];
-
-  onProgress && onProgress('');
+  if (uploadedDataUrls.length >= 2) out.p1_corner4 = uploadedDataUrls[1];
   return out;
-}
-
-// ---------------------------------------------------------------------------
-// CROPS INTELIGENTES usando bounds do Vision
-// ---------------------------------------------------------------------------
-function makeCircleCropsFromBounds(dataUrl, vision) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const W = img.naturalWidth, H = img.naturalHeight;
-
-      // Usa bounds do Vision se disponível, senão detecta localmente
-      let bx, by, bw, bh;
-      if (vision && vision.product_w_pct > 5) {
-        bx = (vision.product_x_pct / 100) * W;
-        by = (vision.product_y_pct / 100) * H;
-        bw = (vision.product_w_pct / 100) * W;
-        bh = (vision.product_h_pct / 100) * H;
-      } else {
-        const bounds = detectProductBounds(img);
-        bx = bounds.x; by = bounds.y; bw = bounds.w; bh = bounds.h;
-      }
-
-      const cx = bx + bw / 2;
-      const cy = by + bh / 2;
-      const cropSize = Math.min(bw, bh) * 0.55;
-
-      const regions = [
-        { cx: cx - bw * 0.15, cy: cy - bh * 0.2  }, // detalhe superior
-        { cx: cx,              cy: cy              }, // centro
-        { cx: cx + bw * 0.15, cy: cy + bh * 0.2  }, // detalhe inferior
-      ];
-
-      const crops = regions.map(r => {
-        const out = document.createElement('canvas');
-        out.width = 600; out.height = 600;
-        const ctx = out.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 600, 600);
-        const half = cropSize / 2;
-        ctx.drawImage(img, r.cx - half, r.cy - half, cropSize, cropSize, 0, 0, 600, 600);
-        return out.toDataURL('image/png');
-      });
-      resolve(crops);
-    };
-    img.onerror = () => resolve(['', '', '']);
-    img.src = dataUrl;
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -420,17 +218,8 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
 
   if (slotNum === 1) {
-    // Vision detecta fundo → remove local → compõe em branco
-    const vision = await analyzeProductVision(src);
-    const noBg = await removeBgLocal(src, vision);
-    const hero = await composeOnWhite(noBg, 1200);
-    // Gera crops a partir da foto original (sem remoção de fundo para os circles)
-    const crops = await makeCircleCropsFromBounds(src, vision);
-    return {
-      mainImg: hero,
-      p1_circles: crops.map(img => ({ img })),
-      p1e_spot: { img: crops[0] || '', x: 58, y: 55, size: 340 },
-    };
+    const img = await callGptImage1(src, getPrompt(1));
+    return { mainImg: img };
   }
 
   if (slotNum === 2) {
@@ -461,64 +250,36 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   return {};
 }
 
-// Detecta bounding box do produto (área não-branca/não-transparente)
-function detectProductBounds(img) {
-  const c = document.createElement('canvas');
-  const scale = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight));
-  c.width = Math.round(img.naturalWidth * scale);
-  c.height = Math.round(img.naturalHeight * scale);
-  const ctx = c.getContext('2d');
-  ctx.drawImage(img, 0, 0, c.width, c.height);
-  const d = ctx.getImageData(0, 0, c.width, c.height).data;
-  let minX = c.width, maxX = 0, minY = c.height, maxY = 0;
-  for (let y = 0; y < c.height; y++) {
-    for (let x = 0; x < c.width; x++) {
-      const i = (y * c.width + x) * 4;
-      const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-      // Considera pixel de produto: não-branco e não-transparente
-      if (a > 30 && !(r > 230 && g > 230 && b > 230)) {
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-      }
-    }
-  }
-  // Fallback: usa imagem inteira
-  if (maxX <= minX || maxY <= minY) return { x: 0, y: 0, w: c.width, h: c.height, scale };
-  return { x: minX / scale, y: minY / scale, w: (maxX - minX) / scale, h: (maxY - minY) / scale, scale: 1 };
-}
-
-// Carrega imagem e retorna 3 crops zoom centralizados no produto
+// Carrega imagem e retorna 3 crops zoom de regiões diferentes
 function makeCircleCrops(dataUrl) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const bounds = detectProductBounds(img);
-      const { x: bx, y: by, w: bw, h: bh } = bounds;
-      const cx = bx + bw / 2;  // centro horizontal do produto
-      const cy = by + bh / 2;  // centro vertical do produto
-
-      // 3 regiões de close: terço superior, terço central, terço inferior do produto
-      const cropSize = Math.min(bw, bh) * 0.6;
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      // 3 regiões: terço esquerdo, centro, terço direito
       const regions = [
-        { cx: cx - bw * 0.2, cy: cy - bh * 0.25 },  // detalhe superior esq
-        { cx: cx,             cy: cy                 },  // centro do produto
-        { cx: cx + bw * 0.2, cy: cy + bh * 0.25 },  // detalhe inferior dir
+        { x: 0, y: h*0.15, w: w*0.45, h: h*0.6 },
+        { x: w*0.27, y: h*0.05, w: w*0.45, h: h*0.6 },
+        { x: w*0.55, y: h*0.15, w: w*0.45, h: h*0.6 },
       ];
-
       const crops = regions.map(r => {
-        const out = document.createElement('canvas');
-        out.width = 600; out.height = 600;
-        const ctx = out.getContext('2d');
+        const c = document.createElement('canvas');
+        c.width = 400; c.height = 400;
+        const ctx = c.getContext('2d');
         ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, 600, 600);
-        const half = cropSize / 2;
-        ctx.drawImage(img, r.cx - half, r.cy - half, cropSize, cropSize, 0, 0, 600, 600);
-        return out.toDataURL('image/png');
+        ctx.fillRect(0,0,400,400);
+        // sample square: the smaller of r.w/r.h
+        const side = Math.min(r.w, r.h);
+        const sx = r.x + (r.w - side)/2;
+        const sy = r.y + (r.h - side)/2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, 400, 400);
+        return c.toDataURL('image/png');
       });
       resolve(crops);
     };
-    img.onerror = () => resolve(['', '', '']);
+    img.onerror = () => resolve(['','','']);
     img.src = dataUrl;
   });
 }
@@ -938,29 +699,18 @@ function UploadZone({ onGenerate, productName, setProductName, onRawFiles }) {
       const merged = [...files, ...urls].slice(0, 5);
       setFiles(merged);
       if (onRawFiles) onRawFiles(merged);
-      // Gera automaticamente com progresso
-      setAiStatus('🔍 Analisando produto...');
-      try {
-        const imgPatch = await autoGenerate(merged, (msg) => setAiStatus(msg));
-        if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
-        setAiStatus('');
-      } catch(e) {
-        setAiStatus('⚠️ ' + e.message);
-        setTimeout(() => setAiStatus(''), 4000);
-      }
+      // Aplica imagens direto, sem precisar clicar em nada
+      const imgPatch = await autoGenerate(merged);
+      if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
     });
   };
 
   const removeFile = (i) => {
     const next = files.filter((_, j) => j !== i);
     setFiles(next);
+    // Reaplicar com as fotos restantes
+    if (next.length > 0) autoGenerate(next).then(patch => onGenerate(patch));
     if (onRawFiles) onRawFiles(next);
-    if (next.length > 0) {
-      setAiStatus('🔄 Atualizando...');
-      autoGenerate(next, (msg) => setAiStatus(msg))
-        .then(patch => { onGenerate(patch); setAiStatus(''); })
-        .catch(() => setAiStatus(''));
-    }
   };
 
   const runAI = async () => {
@@ -1011,18 +761,10 @@ function UploadZone({ onGenerate, productName, setProductName, onRawFiles }) {
             <div key={i} className="drop-thumb" style={{backgroundImage: `url(${url})`}}>
               <button className="drop-thumb-rm" onClick={(e) => { e.stopPropagation(); removeFile(i); }}>×</button>
               <div style={{position:'absolute', bottom:4, left:4, background:'rgba(0,0,0,.7)', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, fontWeight:600}}>
-                {i === 0 ? 'principal' : i === 1 ? 'lifestyle' : `extra ${i}`}
+                {i === 0 ? 'principal' : i === 2 ? 'lifestyle' : `extra ${i}`}
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Status de geração automática */}
-      {aiStatus && (
-        <div style={{marginTop:10, padding:'10px 14px', background:'#f0fdf9', border:'1px solid #6ee7b7', borderRadius:8, fontSize:13, fontWeight:500, color:'#065f46', display:'flex', alignItems:'center', gap:10}}>
-          <span style={{animation:'spin 1s linear infinite', display:'inline-block', fontSize:16}}>⟳</span>
-          {aiStatus}
         </div>
       )}
 
@@ -1392,7 +1134,7 @@ function App() {
                 onCopy={() => { window._imgClipboard = data.mainImg; }}
                 onPaste={(img) => set('mainImg', img)}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
-                label="✦ Remover fundo + estúdio" title="Vision detecta fundo → remove → compõe em branco profissional"
+                label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"
                 promptKeys={[1]}/>
             </div>
           </>}>

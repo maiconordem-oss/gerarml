@@ -137,7 +137,7 @@ html, body {
 .slot-actions button:hover { color: var(--ink); border-color: var(--ink); }
 
 /* The "card" is the canvas — fixed 1000×1000 logical, scales to fit */
-@keyframes spin { to { transform: rotate(360deg); } }
+.canvas-wrap {
   width: 100%;
   aspect-ratio: 1200 / 1540;
   background: white;
@@ -152,6 +152,7 @@ html, body {
   transform-origin: top left;
   background: var(--bg);
   position: relative;
+  overflow: hidden;
 }
 
 /* ======= Reusable canvas type & components ======= */
