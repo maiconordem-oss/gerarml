@@ -242,47 +242,41 @@ function resizeDataUrl(dataUrl, maxPx) {
 }
 
 // ---------------------------------------------------------------------------
-// AUTO-GENERATE — fluxo completo local (~$0.005 total)
+// AUTO-GENERATE — distribui fotos nos slots sem processamento
+// Processamento de fundo é opcional via botões por slot
 // ---------------------------------------------------------------------------
 async function autoGenerate(uploadedDataUrls, onProgress) {
   const out = {};
   if (!uploadedDataUrls.length) return out;
-  const src = uploadedDataUrls[0];
 
-  onProgress && onProgress('🔍 Analisando produto...');
+  onProgress && onProgress('📸 Distribuindo fotos...');
 
-  // 1. Vision analisa a foto (1 chamada barata)
-  const vision = await analyzeProductVision(src);
+  // Foto principal
+  out.mainImg = uploadedDataUrls[0];
 
-  onProgress && onProgress('✂️ Removendo fundo...');
-
-  // 2. Remove fundo localmente usando cor detectada
-  const noBg = await removeBgLocal(src, vision);
-
-  onProgress && onProgress('🎨 Compondo imagens...');
-
-  // 3. Compõe produto em fundo branco — usada nas fotos 1, 2, 3, 5, 6
-  const hero = await composeOnWhite(noBg, 1200);
-  out.mainImg = hero;
-
-  // 4. Crops de detalhe inteligentes (centrados no produto detectado)
-  const crops = await makeCircleCropsFromBounds(src, vision);
-  out.p1_circles = crops.map(img => ({ img }));
-  out.p1e_spot = { img: crops[0] || '', x: 58, y: 55, size: 340 };
-
-  // 5. Lifestyle: usa 2ª foto se disponível, senão a própria foto original
-  if (uploadedDataUrls.length >= 2) {
+  // Lifestyle (fotos 5/6)
+  if (uploadedDataUrls.length >= 3) {
+    out.p5_lifestyle = uploadedDataUrls[2];
+    out.p6_lifestyle = uploadedDataUrls[2];
+  } else if (uploadedDataUrls.length >= 2) {
     out.p5_lifestyle = uploadedDataUrls[1];
     out.p6_lifestyle = uploadedDataUrls[1];
   } else {
-    out.p5_lifestyle = src;
-    out.p6_lifestyle = src;
+    out.p5_lifestyle = uploadedDataUrls[0];
+    out.p6_lifestyle = uploadedDataUrls[0];
   }
 
-  // 6. 4º canto variante C: usa 3ª foto ou crop central
-  out.p1_corner4 = uploadedDataUrls[2] || crops[1] || hero;
+  onProgress && onProgress('✂️ Gerando crops de detalhe...');
 
-  onProgress && onProgress('✅ Pronto!');
+  // Crops inteligentes para os círculos da capa
+  const crops = await makeCircleCropsFromBounds(uploadedDataUrls[0], null);
+  out.p1_circles = crops.map(img => ({ img }));
+  out.p1e_spot = { img: crops[0] || '', x: 58, y: 55, size: 340 };
+
+  // 4º canto variante C
+  out.p1_corner4 = uploadedDataUrls[2] || uploadedDataUrls[1] || crops[1] || uploadedDataUrls[0];
+
+  onProgress && onProgress('');
   return out;
 }
 
@@ -426,8 +420,17 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
 
   if (slotNum === 1) {
-    const img = await callGptImage1(src, getPrompt(1));
-    return { mainImg: img };
+    // Vision detecta fundo → remove local → compõe em branco
+    const vision = await analyzeProductVision(src);
+    const noBg = await removeBgLocal(src, vision);
+    const hero = await composeOnWhite(noBg, 1200);
+    // Gera crops a partir da foto original (sem remoção de fundo para os circles)
+    const crops = await makeCircleCropsFromBounds(src, vision);
+    return {
+      mainImg: hero,
+      p1_circles: crops.map(img => ({ img })),
+      p1e_spot: { img: crops[0] || '', x: 58, y: 55, size: 340 },
+    };
   }
 
   if (slotNum === 2) {
@@ -1389,7 +1392,7 @@ function App() {
                 onCopy={() => { window._imgClipboard = data.mainImg; }}
                 onPaste={(img) => set('mainImg', img)}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
-                label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"
+                label="✦ Remover fundo + estúdio" title="Vision detecta fundo → remove → compõe em branco profissional"
                 promptKeys={[1]}/>
             </div>
           </>}>
