@@ -51,190 +51,92 @@ function Photo1A({ data, set, bgMode }) {
   );
 }
 
-/* ---- VARIANTE E: produto grande + círculos de detalhe sobrepostos ---- */
-/*
-  Layout inspirado nas imagens de referência:
-  - Produto ocupa quase toda a área
-  - 3 círculos com borda laranja sobrepostos (posições configuráveis)
-  - Cada círculo tem controles inline: trocar foto, aumentar/diminuir
-  - Posições padrão: inf-esq, inf-dir, sup-dir (como nas referências)
-*/
+/* ---- VARIANTE E: produto grande + 1 círculo de detalhe movível ---- */
 function Photo1E({ data, set, bgMode }) {
-  const { useState: uS, useRef: uR } = React;
+  const spot = data.p1e_spot || { img: '', x: 60, y: 58, size: 340 };
+  const setSpot = (patch) => set('p1e_spot', { ...spot, ...patch });
 
-  // Estado dos círculos: posição X/Y (% da tela) e tamanho
-  const spots = data.p1e_spots || [
-    { img: '', x: 8,  y: 62, size: 300 },
-    { img: '', x: 62, y: 62, size: 300 },
-    { img: '', x: 62, y: 8,  size: 300 },
-  ];
-
-  const setSpot = (i, patch) => {
-    const next = spots.map((s, j) => j === i ? { ...s, ...patch } : s);
-    set('p1e_spots', next);
-  };
-
-  // Abre input file para trocar imagem do spot i
-  const fileRefs = [uR(null), uR(null), uR(null)];
-  const pickFile = (i) => fileRefs[i].current && fileRefs[i].current.click();
-  const onFile = (i, e) => {
+  const fileRef = React.useRef(null);
+  const onFile = (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
-    r.onload = ev => setSpot(i, { img: ev.target.result });
+    r.onload = ev => setSpot({ img: ev.target.result });
     r.readAsDataURL(f);
   };
 
-  // Drag para mover círculo (em px → converte para %)
-  const canvasW = 1200, canvasH = 1540;
-  const startDrag = (i, ev) => {
+  const startDrag = (ev) => {
     ev.stopPropagation();
     const startX = ev.clientX, startY = ev.clientY;
-    const origX = spots[i].x, origY = spots[i].y;
+    const origX = spot.x, origY = spot.y;
     const onMove = (e) => {
-      // escala: o canvas é escalado via CSS, precisamos do scale atual
-      const scale = parseFloat(document.querySelector('.canvas')?.style.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1');
+      const scaleEl = document.querySelector('.canvas');
+      const scale = parseFloat(scaleEl?.style.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1');
       const dx = (e.clientX - startX) / scale;
       const dy = (e.clientY - startY) / scale;
-      const nx = Math.max(0, Math.min(85, origX + (dx / canvasW) * 100));
-      const ny = Math.max(0, Math.min(85, origY + (dy / canvasH) * 100));
-      setSpot(i, { x: nx, y: ny });
+      setSpot({
+        x: Math.max(0, Math.min(85, origX + (dx / 1200) * 100)),
+        y: Math.max(0, Math.min(85, origY + (dy / 1540) * 100)),
+      });
     };
     const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
 
-  const BORDER = 8;
-  const borderColor = '#E89522';
+  const sz = spot.size || 340;
 
   return (
     <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', overflow: 'hidden' }}>
-
-      {/* Produto — área toda */}
+      {/* Produto */}
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60 }}>
         {data.mainImg
           ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           : <BgPlaceholder style={{ width: '80%', height: '70%' }} />}
       </div>
 
-      {/* Círculos de detalhe sobrepostos */}
-      {spots.map((spot, i) => {
-        const sz = spot.size || 300;
-        return (
-          <div key={i}
-            onMouseDown={(ev) => startDrag(i, ev)}
-            style={{
-              position: 'absolute',
-              left: `${spot.x}%`,
-              top: `${spot.y}%`,
-              width: sz, height: sz,
-              borderRadius: '50%',
-              border: `${BORDER}px solid ${borderColor}`,
-              background: '#fff',
-              overflow: 'hidden',
-              cursor: 'grab',
-              boxShadow: '0 8px 28px rgba(0,0,0,.18)',
-              zIndex: 10,
-              flexShrink: 0,
-            }}
-          >
-            {/* Imagem do círculo */}
-            {spot.img
-              ? <img src={spot.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
-              : <BgPlaceholder style={{ borderRadius: '50%' }} />}
+      {/* Círculo único movível */}
+      <div
+        onMouseDown={startDrag}
+        style={{
+          position: 'absolute',
+          left: `${spot.x}%`, top: `${spot.y}%`,
+          width: sz, height: sz, borderRadius: '50%',
+          border: '8px solid #E89522',
+          background: '#fff', overflow: 'hidden',
+          cursor: 'grab', boxShadow: '0 8px 28px rgba(0,0,0,.18)',
+          zIndex: 10,
+        }}
+      >
+        {spot.img
+          ? <img src={spot.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+          : <BgPlaceholder style={{ borderRadius: '50%' }} />}
 
-            {/* Controles inline — aparecem sempre (visíveis para edição) */}
-            <div
-              onMouseDown={ev => ev.stopPropagation()}
-              style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                background: 'rgba(0,0,0,0.55)',
-                display: 'flex', justifyContent: 'center', gap: 8,
-                padding: '10px 0',
-              }}
-            >
-              {/* Diminuir */}
-              <button
-                onClick={(ev) => { ev.stopPropagation(); setSpot(i, { size: Math.max(160, sz - 30) }); }}
-                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-              >−</button>
-
-              {/* Trocar imagem */}
-              <button
-                onClick={(ev) => { ev.stopPropagation(); pickFile(i); }}
-                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-              >📷</button>
-
-              {/* Aumentar */}
-              <button
-                onClick={(ev) => { ev.stopPropagation(); setSpot(i, { size: Math.min(560, sz + 30) }); }}
-                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-              >+</button>
-            </div>
-
-            {/* Input file oculto */}
-            <input ref={fileRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={(e) => onFile(i, e)} />
-          </div>
-        );
-      })}
+        {/* Controles inline */}
+        <div onMouseDown={e => e.stopPropagation()} style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'rgba(0,0,0,.5)', display: 'flex',
+          justifyContent: 'center', gap: 10, padding: '10px 0',
+        }}>
+          <button onClick={e => { e.stopPropagation(); setSpot({ size: Math.max(180, sz - 40) }); }}
+            style={{ width: 44, height: 44, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 22, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>−</button>
+          <button onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
+            style={{ width: 44, height: 44, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 16, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>📷</button>
+          <button onClick={e => { e.stopPropagation(); setSpot({ size: Math.min(600, sz + 40) }); }}
+            style={{ width: 44, height: 44, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 22, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>+</button>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
+      </div>
     </div>
   );
 }
 
-/* ---- VARIANTE C: 4 cantos + produto centro ---- */
+/* ---- VARIANTE C: só o produto, sem nada sobreposto ---- */
 function Photo1C({ data, set, bgMode }) {
-  const circles = data.p1_circles || [];
-  // Usamos p1_circles[0..2] + p1_corner4 para o 4º canto
-  const corner4img = data.p1_corner4 || '';
-  const CORNER = 280; // tamanho dos quadrados de canto
-  const PAD = 60;
-
-  const CornerBox = ({ img, style }) => (
-    <div style={{
-      width: CORNER, height: CORNER, borderRadius: 20,
-      border: '5px solid #E89522', overflow: 'hidden',
-      background: '#f5f5f5', flexShrink: 0, ...style
-    }}>
-      {img
-        ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        : <BgPlaceholder />}
-    </div>
-  );
-
   return (
-    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#F4F4F4', position: 'relative' }}>
-
-      {/* Canto superior esquerdo */}
-      <div style={{ position: 'absolute', top: PAD, left: PAD }}>
-        <CornerBox img={circles[0]?.img} />
-      </div>
-      {/* Canto superior direito */}
-      <div style={{ position: 'absolute', top: PAD, right: PAD }}>
-        <CornerBox img={circles[1]?.img} />
-      </div>
-      {/* Canto inferior esquerdo */}
-      <div style={{ position: 'absolute', bottom: PAD, left: PAD }}>
-        <CornerBox img={circles[2]?.img} />
-      </div>
-      {/* Canto inferior direito */}
-      <div style={{ position: 'absolute', bottom: PAD, right: PAD }}>
-        <CornerBox img={corner4img} />
-      </div>
-
-      {/* Produto no centro */}
-      <div style={{
-        position: 'absolute',
-        top: PAD + CORNER + 40,
-        bottom: PAD + CORNER + 40,
-        left: PAD + CORNER + 40,
-        right: PAD + CORNER + 40,
-        display: 'grid', placeItems: 'center'
-      }}>
-        {data.mainImg
-          ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-          : <BgPlaceholder />}
-      </div>
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', display: 'grid', placeItems: 'center', padding: 80 }}>
+      {data.mainImg
+        ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        : <BgPlaceholder style={{ width: '80%', height: '80%' }} />}
     </div>
   );
 }

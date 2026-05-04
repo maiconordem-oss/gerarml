@@ -13,11 +13,7 @@ const INITIAL = {
   p1_circles: [{ img: '' }, { img: '' }, { img: '' }],
   p1_corner4: '',
   p1_variant: 'A',
-  p1e_spots: [
-    { img: '', x: 6,  y: 60, size: 300 },
-    { img: '', x: 60, y: 60, size: 300 },
-    { img: '', x: 60, y: 6,  size: 300 },
-  ],
+  p1e_spot: { img: '', x: 60, y: 58, size: 340 },
 
   p2_f1_title: 'Sistema manual:',
   p2_f1_text: 'Com manivela para ajuste fino da inclinação.',
@@ -298,8 +294,8 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
 function VariantPicker({ value, onChange }) {
   const variants = [
     { id: 'A', label: '3 círculos' },
-    { id: 'E', label: 'Faixa lateral' },
-    { id: 'C', label: '4 cantos' },
+    { id: 'E', label: '1 círculo' },
+    { id: 'C', label: 'Só produto' },
   ];
   return (
     <div style={{ display: 'flex', gap: 4, background: '#f0f0f0', padding: 3, borderRadius: 8 }}>
@@ -533,17 +529,12 @@ function TweaksUI({ data, set, productName, setProductName, storeName, setStoreN
           <ImgField label="Foto 1 — Detalhe direito / canto inf. esq." value={data.p1_circles[2].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[2]={img:v}; set('p1_circles', cs); }}/>
           <ImgField label="Foto 1 — 4º canto inf. dir. (variante C)" value={data.p1_corner4||''} onChange={(v) => set('p1_corner4', v)}/>
           {(data.p1_variant||'A') === 'E' && (<>
-            <SectionLabel>Variante E — círculos de detalhe</SectionLabel>
-            <Hint>Arraste os círculos diretamente na foto para reposicionar. Use +/− para redimensionar, ou troque a imagem abaixo.</Hint>
-            {(data.p1e_spots||[]).map((spot, i) => (
-              <ImgField key={i} label={`Círculo ${i+1} (tamanho atual: ${spot.size||300}px)`}
-                value={spot.img||''}
-                onChange={(v) => {
-                  const next = (data.p1e_spots||[]).map((s,j) => j===i ? {...s, img:v} : s);
-                  set('p1e_spots', next);
-                }}
-              />
-            ))}
+            <SectionLabel>Variante E — círculo de detalhe</SectionLabel>
+            <Hint>Arraste o círculo diretamente na foto para reposicionar. Use +/− para redimensionar, ou troque a imagem abaixo.</Hint>
+            <ImgField label={`Imagem do círculo (tamanho: ${(data.p1e_spot||{}).size||340}px)`}
+              value={(data.p1e_spot||{}).img||''}
+              onChange={(v) => set('p1e_spot', { ...(data.p1e_spot||{}), img: v })}
+            />
           </>)}
           <ImgField label="Foto 5 — Lifestyle / Estoque" value={data.p5_lifestyle} onChange={(v) => set('p5_lifestyle', v)}/>
           <ImgField label="Foto 6 — Lifestyle / Estoque" value={data.p6_lifestyle} onChange={(v) => set('p6_lifestyle', v)}/>
