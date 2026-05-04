@@ -250,36 +250,64 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   return {};
 }
 
-// Carrega imagem e retorna 3 crops zoom de regiões diferentes
+// Detecta bounding box do produto (área não-branca/não-transparente)
+function detectProductBounds(img) {
+  const c = document.createElement('canvas');
+  const scale = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight));
+  c.width = Math.round(img.naturalWidth * scale);
+  c.height = Math.round(img.naturalHeight * scale);
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  let minX = c.width, maxX = 0, minY = c.height, maxY = 0;
+  for (let y = 0; y < c.height; y++) {
+    for (let x = 0; x < c.width; x++) {
+      const i = (y * c.width + x) * 4;
+      const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+      // Considera pixel de produto: não-branco e não-transparente
+      if (a > 30 && !(r > 230 && g > 230 && b > 230)) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  // Fallback: usa imagem inteira
+  if (maxX <= minX || maxY <= minY) return { x: 0, y: 0, w: c.width, h: c.height, scale };
+  return { x: minX / scale, y: minY / scale, w: (maxX - minX) / scale, h: (maxY - minY) / scale, scale: 1 };
+}
+
+// Carrega imagem e retorna 3 crops zoom centralizados no produto
 function makeCircleCrops(dataUrl) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
-      // 3 regiões: terço esquerdo, centro, terço direito
+      const bounds = detectProductBounds(img);
+      const { x: bx, y: by, w: bw, h: bh } = bounds;
+      const cx = bx + bw / 2;  // centro horizontal do produto
+      const cy = by + bh / 2;  // centro vertical do produto
+
+      // 3 regiões de close: terço superior, terço central, terço inferior do produto
+      const cropSize = Math.min(bw, bh) * 0.6;
       const regions = [
-        { x: 0, y: h*0.15, w: w*0.45, h: h*0.6 },
-        { x: w*0.27, y: h*0.05, w: w*0.45, h: h*0.6 },
-        { x: w*0.55, y: h*0.15, w: w*0.45, h: h*0.6 },
+        { cx: cx - bw * 0.2, cy: cy - bh * 0.25 },  // detalhe superior esq
+        { cx: cx,             cy: cy                 },  // centro do produto
+        { cx: cx + bw * 0.2, cy: cy + bh * 0.25 },  // detalhe inferior dir
       ];
+
       const crops = regions.map(r => {
-        const c = document.createElement('canvas');
-        c.width = 400; c.height = 400;
-        const ctx = c.getContext('2d');
+        const out = document.createElement('canvas');
+        out.width = 600; out.height = 600;
+        const ctx = out.getContext('2d');
         ctx.fillStyle = '#fff';
-        ctx.fillRect(0,0,400,400);
-        // sample square: the smaller of r.w/r.h
-        const side = Math.min(r.w, r.h);
-        const sx = r.x + (r.w - side)/2;
-        const sy = r.y + (r.h - side)/2;
-        ctx.drawImage(img, sx, sy, side, side, 0, 0, 400, 400);
-        return c.toDataURL('image/png');
+        ctx.fillRect(0, 0, 600, 600);
+        const half = cropSize / 2;
+        ctx.drawImage(img, r.cx - half, r.cy - half, cropSize, cropSize, 0, 0, 600, 600);
+        return out.toDataURL('image/png');
       });
       resolve(crops);
     };
-    img.onerror = () => resolve(['','','']);
+    img.onerror = () => resolve(['', '', '']);
     img.src = dataUrl;
   });
 }
