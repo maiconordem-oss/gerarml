@@ -11,6 +11,8 @@ const INITIAL = {
   productOnlyImg: '',
 
   p1_circles: [{ img: '' }, { img: '' }, { img: '' }],
+  p1_corner4: '',
+  p1_variant: 'A',
 
   p2_f1_title: 'Sistema manual:',
   p2_f1_text: 'Com manivela para ajuste fino da inclinação.',
@@ -128,6 +130,11 @@ async function autoGenerate(uploadedDataUrls) {
   const crops = await makeCircleCrops(uploadedDataUrls[0]);
   out.p1_circles = crops.map(img => ({ img }));
 
+  // 4º canto (variante C): usa a 2ª foto enviada se existir
+  if (uploadedDataUrls.length >= 2) {
+    out.p1_corner4 = uploadedDataUrls[1];
+  }
+
   return out;
 }
 
@@ -166,7 +173,7 @@ function makeCircleCrops(dataUrl) {
 }
 
 /* ============== Slot wrapper with scaling + actions ============== */
-function Slot({ num, title, children, productName, bg }) {
+function Slot({ num, title, children, productName, bg, extra }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const [scale, setScale] = useState(0.4);
@@ -197,6 +204,7 @@ function Slot({ num, title, children, productName, bg }) {
           <button onClick={handleExport} title="Baixar PNG 1200×1540">↓ PNG</button>
         </div>
       </div>
+      {extra && <div style={{marginBottom:6}}>{extra}</div>}
       <div className="canvas-wrap" ref={wrapRef}>
         <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
           {bg && (
@@ -279,6 +287,29 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('Resposta sem JSON válido');
   return JSON.parse(m[0]);
+}
+
+/* ============== Seletor de variante de capa ============== */
+function VariantPicker({ value, onChange }) {
+  const variants = [
+    { id: 'A', label: '3 círculos' },
+    { id: 'E', label: 'Faixa lateral' },
+    { id: 'C', label: '4 cantos' },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 4, background: '#f0f0f0', padding: 3, borderRadius: 8 }}>
+      {variants.map(v => (
+        <button key={v.id} onClick={() => onChange(v.id)} style={{
+          flex: 1, padding: '5px 0', border: 0, borderRadius: 6, fontSize: 11, fontWeight: 700,
+          cursor: 'pointer',
+          background: value === v.id ? '#1F7A3A' : 'transparent',
+          color: value === v.id ? 'white' : '#666',
+          boxShadow: value === v.id ? '0 1px 3px rgba(0,0,0,.15)' : 'none',
+          transition: 'all .12s',
+        }}>{v.label}</button>
+      ))}
+    </div>
+  );
 }
 
 /* ============== OpenAI API Key Banner ============== */
@@ -493,8 +524,9 @@ function TweaksUI({ data, set, productName, setProductName, storeName, setStoreN
         {tab === 'imgs' && (<>
           <ImgField label="Imagem principal do produto" value={data.mainImg} onChange={(v) => set('mainImg', v)}/>
           <ImgField label="Foto 1 — Detalhe esquerdo" value={data.p1_circles[0].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[0]={img:v}; set('p1_circles', cs); }}/>
-          <ImgField label="Foto 1 — Detalhe centro" value={data.p1_circles[1].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[1]={img:v}; set('p1_circles', cs); }}/>
-          <ImgField label="Foto 1 — Detalhe direito" value={data.p1_circles[2].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[2]={img:v}; set('p1_circles', cs); }}/>
+          <ImgField label="Foto 1 — Detalhe centro / canto sup. dir." value={data.p1_circles[1].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[1]={img:v}; set('p1_circles', cs); }}/>
+          <ImgField label="Foto 1 — Detalhe direito / canto inf. esq." value={data.p1_circles[2].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[2]={img:v}; set('p1_circles', cs); }}/>
+          <ImgField label="Foto 1 — 4º canto inf. dir. (variante C)" value={data.p1_corner4||''} onChange={(v) => set('p1_corner4', v)}/>
           <ImgField label="Foto 5 — Lifestyle / Estoque" value={data.p5_lifestyle} onChange={(v) => set('p5_lifestyle', v)}/>
           <ImgField label="Foto 6 — Lifestyle / Estoque" value={data.p6_lifestyle} onChange={(v) => set('p6_lifestyle', v)}/>
           <SectionLabel>Tamanho da miniatura do produto</SectionLabel>
@@ -776,7 +808,10 @@ function App() {
       <UploadZone onGenerate={merge} productName={productName} setProductName={setProductName}/>
 
       <div className="grid">
-        <Slot num={1} title="Capa com destaques" productName={productName} bg={data.bg_mode ? data.bg_foto1 : null}><MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/></Slot>
+        <Slot num={1} title="Capa com destaques" productName={productName} bg={data.bg_mode ? data.bg_foto1 : null}
+          extra={<VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>}>
+          <MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/>
+        </Slot>
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}><MLPhoto2 data={data} set={set} bgMode={data.bg_mode}/></Slot>
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}><MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/></Slot>
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}><MLPhoto4 data={data} set={set} bgMode={data.bg_mode}/></Slot>

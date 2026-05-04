@@ -3,37 +3,159 @@ const Ic = window.MLIcons;
 const Ed = window.MLEditable;
 const Drag = window.MLDraggable;
 
-/* ============== Photo 1: Capa com 3 destaques em círculos ============== */
-function Photo1({ data, set, bgMode }) {
+/* ============================================================
+   CAPA — 3 VARIANTES (sem texto)
+   A = 3 círculos  |  E = faixa lateral  |  C = grid 4 cantos
+   ============================================================ */
+
+/* helper: placeholder sem texto */
+function BgPlaceholder({ style = {}, label = '' }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'repeating-linear-gradient(-45deg,#EFEFEF 0 12px,#E6E6E6 12px 24px)',
+      display: 'grid', placeItems: 'center',
+      color: '#bbb', fontSize: 13, fontFamily: 'ui-monospace,monospace',
+      borderRadius: 8,
+      ...style
+    }}>{label}</div>
+  );
+}
+
+/* ---- VARIANTE A: 3 círculos (atual) ---- */
+function Photo1A({ data, set, bgMode }) {
   const circles = data.p1_circles || [];
   return (
-    <div className="tpl" style={{ padding: '90px 80px 80px', background: bgMode ? 'transparent' : '#fff', position:'relative' }}>
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', display: 'flex', flexDirection: 'column', padding: '90px 80px 80px' }}>
       <Drag id="p1_circles_row" data={data} set={set} enabled={bgMode} style={{ display: 'flex', justifyContent: 'space-between', gap: 30, alignItems: 'flex-start', marginBottom: -40 }}>
         {circles.map((c, i) =>
-        <div key={i} style={{
-          width: 290, height: 290,
-          borderRadius: '50%',
-          border: '7px solid #E89522',
-          background: '#fff',
-          overflow: 'hidden',
-          display: 'grid', placeItems: 'center',
-          transform: i === 1 ? 'translateY(-30px)' : 'none',
-          boxShadow: '0 8px 22px rgba(0,0,0,.08)',
-          flexShrink: 0
-        }}>
-            {c.img ?
-          <img src={c.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> :
-          <div className="img-placeholder" style={{ borderRadius: '50%', width: '100%', height: '100%', fontSize: 13 }}>detalhe {i + 1}</div>}
+          <div key={i} style={{
+            width: 290, height: 290, borderRadius: '50%',
+            border: '7px solid #E89522', background: '#fff',
+            overflow: 'hidden', display: 'grid', placeItems: 'center',
+            transform: i === 1 ? 'translateY(-30px)' : 'none',
+            boxShadow: '0 8px 22px rgba(0,0,0,.08)', flexShrink: 0
+          }}>
+            {c.img
+              ? <img src={c.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <BgPlaceholder style={{ borderRadius: '50%' }} />}
           </div>
         )}
       </Drag>
       <Drag id="p1_main" data={data} set={set} enabled={bgMode} style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-        {data.mainImg ?
-        <img src={data.mainImg} alt="" style={{ maxWidth: '95%', maxHeight: '100%', objectFit: 'contain' }} /> :
-        <div className="img-placeholder" style={{ width: '80%', height: '80%' }}>foto principal do produto</div>}
+        {data.mainImg
+          ? <img src={data.mainImg} alt="" style={{ maxWidth: '95%', maxHeight: '100%', objectFit: 'contain' }} />
+          : <BgPlaceholder style={{ width: '80%', height: '80%' }} />}
       </Drag>
-    </div>);
+    </div>
+  );
+}
 
+/* ---- VARIANTE E: faixa lateral esquerda com 3 fotos ---- */
+function Photo1E({ data, set, bgMode }) {
+  const circles = data.p1_circles || [];
+  const STRIP = 300; // largura da faixa lateral
+  return (
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#F4F4F4', position: 'relative', display: 'flex' }}>
+
+      {/* Faixa lateral */}
+      <div style={{
+        width: STRIP, flexShrink: 0, height: '100%',
+        background: bgMode ? 'rgba(255,255,255,0.06)' : '#fff',
+        borderRight: bgMode ? 'none' : '1px solid #E6E6E6',
+        display: 'flex', flexDirection: 'column',
+        gap: 24, padding: 28, justifyContent: 'center'
+      }}>
+        {[0, 1, 2].map(i => {
+          const c = circles[i] || {};
+          return (
+            <div key={i} style={{
+              flex: 1, borderRadius: 16,
+              border: `5px solid ${i === 0 ? '#E89522' : i === 1 ? '#1F7A3A' : '#E89522'}`,
+              overflow: 'hidden', background: '#f5f5f5',
+              minHeight: 0
+            }}>
+              {c.img
+                ? <img src={c.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                : <BgPlaceholder />}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Produto — área principal */}
+      <div style={{ flex: 1, display: 'grid', placeItems: 'center', padding: 60, minWidth: 0 }}>
+        {data.mainImg
+          ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          : <BgPlaceholder style={{ width: '80%', height: '70%' }} />}
+      </div>
+    </div>
+  );
+}
+
+/* ---- VARIANTE C: 4 cantos + produto centro ---- */
+function Photo1C({ data, set, bgMode }) {
+  const circles = data.p1_circles || [];
+  // Usamos p1_circles[0..2] + p1_corner4 para o 4º canto
+  const corner4img = data.p1_corner4 || '';
+  const CORNER = 280; // tamanho dos quadrados de canto
+  const PAD = 60;
+
+  const CornerBox = ({ img, style }) => (
+    <div style={{
+      width: CORNER, height: CORNER, borderRadius: 20,
+      border: '5px solid #E89522', overflow: 'hidden',
+      background: '#f5f5f5', flexShrink: 0, ...style
+    }}>
+      {img
+        ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        : <BgPlaceholder />}
+    </div>
+  );
+
+  return (
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#F4F4F4', position: 'relative' }}>
+
+      {/* Canto superior esquerdo */}
+      <div style={{ position: 'absolute', top: PAD, left: PAD }}>
+        <CornerBox img={circles[0]?.img} />
+      </div>
+      {/* Canto superior direito */}
+      <div style={{ position: 'absolute', top: PAD, right: PAD }}>
+        <CornerBox img={circles[1]?.img} />
+      </div>
+      {/* Canto inferior esquerdo */}
+      <div style={{ position: 'absolute', bottom: PAD, left: PAD }}>
+        <CornerBox img={circles[2]?.img} />
+      </div>
+      {/* Canto inferior direito */}
+      <div style={{ position: 'absolute', bottom: PAD, right: PAD }}>
+        <CornerBox img={corner4img} />
+      </div>
+
+      {/* Produto no centro */}
+      <div style={{
+        position: 'absolute',
+        top: PAD + CORNER + 40,
+        bottom: PAD + CORNER + 40,
+        left: PAD + CORNER + 40,
+        right: PAD + CORNER + 40,
+        display: 'grid', placeItems: 'center'
+      }}>
+        {data.mainImg
+          ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          : <BgPlaceholder />}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Dispatcher: escolhe a variante certa ---- */
+function Photo1({ data, set, bgMode }) {
+  const v = data.p1_variant || 'A';
+  if (v === 'E') return <Photo1E data={data} set={set} bgMode={bgMode} />;
+  if (v === 'C') return <Photo1C data={data} set={set} bgMode={bgMode} />;
+  return <Photo1A data={data} set={set} bgMode={bgMode} />;
 }
 
 /* ============== Photo 2: Características principais ============== */
