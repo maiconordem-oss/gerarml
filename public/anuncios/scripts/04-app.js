@@ -214,8 +214,11 @@ function Slot({ num, title, children, productName, bg }) {
   );
 }
 
-/* ============== AI Text generation ============== */
+/* ============== AI Text generation — OpenAI gpt-4o-mini ============== */
 async function generateTextsWithAI(productName, category, extras) {
+  const key = (window.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || '').trim();
+  if (!key) throw new Error('Configure sua chave OpenAI na seção "Chave OpenAI" acima.');
+
   const prompt = `Você gera textos de marketing para anúncios de Mercado Livre em PT-BR.
 Produto: "${productName}"
 Categoria: "${category || 'produto'}"
@@ -257,16 +260,84 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
   "p4_callout_text": "frase 8-12 palavras"
 }`;
 
-  try {
-    const text = await window.claude.complete(prompt);
-    // Extract JSON from response
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Resposta sem JSON');
-    return JSON.parse(m[0]);
-  } catch (e) {
-    console.error('AI generation failed:', e);
-    throw e;
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 1200,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error?.message || `OpenAI error ${resp.status}`);
   }
+  const data = await resp.json();
+  const text = data.choices[0].message.content;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('Resposta sem JSON válido');
+  return JSON.parse(m[0]);
+}
+
+/* ============== OpenAI API Key Banner ============== */
+function OpenAIKeyBanner({ apiKey, setApiKey }) {
+  const [editing, setEditing] = React.useState(!apiKey);
+  const [draft, setDraft] = React.useState(apiKey || '');
+
+  const save = () => {
+    const v = draft.trim();
+    localStorage.setItem('openai_api_key', v);
+    window.OPENAI_API_KEY = v;
+    setApiKey(v);
+    setEditing(false);
+  };
+  const clear = () => {
+    localStorage.removeItem('openai_api_key');
+    window.OPENAI_API_KEY = '';
+    setApiKey('');
+    setDraft('');
+    setEditing(true);
+  };
+
+  if (!editing && apiKey) {
+    return (
+      <div style={{maxWidth:920, margin:'0 auto 16px', background:'#f0fdf9', border:'1px solid #6ee7b7', borderRadius:12, padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          <span style={{fontSize:18}}>✦</span>
+          <div>
+            <div style={{fontFamily:'Montserrat', fontWeight:800, fontSize:13, color:'#065f46'}}>OpenAI conectada</div>
+            <div style={{fontSize:11, color:'#6b7280'}}>sk-...{apiKey.slice(-6)} · geração de texto + melhorias de imagem ativas</div>
+          </div>
+        </div>
+        <button onClick={clear} style={{padding:'6px 12px', border:'1px solid #6ee7b7', borderRadius:7, background:'white', fontSize:12, fontWeight:600, cursor:'pointer', color:'#6b7280'}}>Trocar chave</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{maxWidth:920, margin:'0 auto 16px', background:'#fff', border:'2px dashed #6ee7b7', borderRadius:12, padding:'20px 24px', boxShadow:'0 4px 16px rgba(0,0,0,.06)'}}>
+      <div style={{fontFamily:'Montserrat', fontWeight:800, fontSize:15, marginBottom:4}}>✦ Configure sua chave OpenAI</div>
+      <div style={{fontSize:12, color:'#6b7280', marginBottom:14}}>
+        Necessária para geração de textos com IA e melhorias de imagem. A chave fica salva localmente no navegador e nunca é enviada para servidores externos — só vai direto para a OpenAI.
+      </div>
+      <div style={{display:'flex', gap:8}}>
+        <input
+          type="password"
+          placeholder="sk-proj-..."
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && save()}
+          style={{flex:1, padding:'10px 14px', border:'1px solid #d1fae5', borderRadius:8, fontSize:13, fontFamily:'monospace', outline:'none'}}
+        />
+        <button onClick={save} disabled={!draft.trim().startsWith('sk-')} style={{padding:'10px 20px', background:'#10a37f', color:'white', border:0, borderRadius:8, fontSize:13, fontWeight:700, cursor: draft.trim().startsWith('sk-') ? 'pointer' : 'not-allowed', opacity: draft.trim().startsWith('sk-') ? 1 : 0.5}}>Salvar</button>
+      </div>
+      <div style={{fontSize:11, color:'#9ca3af', marginTop:8}}>
+        Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank" style={{color:'#10a37f'}}>platform.openai.com/api-keys</a>
+      </div>
+    </div>
+  );
 }
 
 /* ============== Upload zone ============== */
@@ -482,6 +553,8 @@ function Field({ label, value, onChange, multi, maxLength }) {
 function ImgField({ label, value, onChange }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(null);
+  const [section, setSection] = React.useState('local');
+
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -489,9 +562,9 @@ function ImgField({ label, value, onChange }) {
     r.onload = (ev) => onChange(ev.target.result);
     r.readAsDataURL(file);
   };
-  const apply = async (fn, label) => {
+  const apply = async (fn, key) => {
     if (!value) return;
-    setBusy(label);
+    setBusy(key);
     try {
       const out = await fn(value);
       onChange(out);
@@ -500,6 +573,7 @@ function ImgField({ label, value, onChange }) {
     }
     setBusy(null);
   };
+
   return (
     <div style={{marginBottom:14}}>
       <div style={{fontSize:11, fontWeight:600, color:'#666', marginBottom:4}}>{label}</div>
@@ -511,23 +585,51 @@ function ImgField({ label, value, onChange }) {
         <button onClick={() => inputRef.current.click()} style={{flex:1, padding:'8px 10px', border:'1px solid #ddd', borderRadius:6, background:'white', fontSize:12, fontWeight:600, cursor:'pointer'}}>Trocar imagem</button>
         {value && <button onClick={() => onChange('')} style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:6, background:'white', fontSize:12, cursor:'pointer', color:'#999'}}>×</button>}
       </div>
-      {value && (
-        <div style={{display:'flex', gap:4, marginTop:6, flexWrap:'wrap'}}>
-          <ImgBtn busy={busy==='chroma'} onClick={() => apply(window.MLImgUtils.removeBgChroma, 'chroma')}>Remover fundo (claro)</ImgBtn>
-          <ImgBtn busy={busy==='smart'} onClick={() => apply(window.MLImgUtils.removeBgSmart, 'smart')}>Remover fundo (IA)</ImgBtn>
-          <ImgBtn busy={busy==='adj'} onClick={() => apply(window.MLImgUtils.autoAdjust, 'adj')}>Auto-ajuste</ImgBtn>
-          <ImgBtn busy={busy==='lvl'} onClick={() => apply(window.MLImgUtils.autoLevels, 'lvl')}>Auto-níveis</ImgBtn>
+
+      {value && (<>
+        <div style={{display:'flex', gap:3, marginTop:8, background:'#f5f5f5', padding:3, borderRadius:7}}>
+          <button onClick={() => setSection('local')} style={{flex:1, padding:'5px 4px', border:0, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer', background: section==='local' ? 'white' : 'transparent', color: section==='local' ? '#1a1a1a' : '#888', boxShadow: section==='local' ? '0 1px 2px rgba(0,0,0,.08)' : 'none'}}>Local</button>
+          <button onClick={() => setSection('openai')} style={{flex:1, padding:'5px 4px', border:0, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer', background: section==='openai' ? '#10a37f' : 'transparent', color: section==='openai' ? 'white' : '#888', boxShadow: section==='openai' ? '0 1px 2px rgba(0,0,0,.12)' : 'none'}}>✦ OpenAI</button>
         </div>
-      )}
+
+        {section === 'local' && (
+          <div style={{display:'flex', gap:4, marginTop:6, flexWrap:'wrap'}}>
+            <ImgBtn busy={busy==='chroma'} onClick={() => apply(window.MLImgUtils.removeBgChroma,'chroma')}>Remover fundo (claro)</ImgBtn>
+            <ImgBtn busy={busy==='smart'} onClick={() => apply(window.MLImgUtils.removeBgSmart,'smart')}>Remover fundo (IA local)</ImgBtn>
+            <ImgBtn busy={busy==='adj'} onClick={() => apply(window.MLImgUtils.autoAdjust,'adj')}>Auto-ajuste</ImgBtn>
+            <ImgBtn busy={busy==='lvl'} onClick={() => apply(window.MLImgUtils.autoLevels,'lvl')}>Auto-níveis</ImgBtn>
+          </div>
+        )}
+
+        {section === 'openai' && (
+          <div style={{display:'flex', flexDirection:'column', gap:5, marginTop:6}}>
+            <OpenAIImgBtn busy={busy==='vision-bg'} icon="🔍" title="Remover fundo (Vision)" desc="GPT-4o detecta cor do fundo e remove com precisão" onClick={() => apply(window.MLImgUtils.removeBgVision,'vision-bg')}/>
+            <OpenAIImgBtn busy={busy==='improve'} icon="✨" title="Melhorar qualidade" desc="gpt-image-1 corrige iluminação, nitidez e cores" onClick={() => apply(window.MLImgUtils.improveQuality,'improve')}/>
+            <OpenAIImgBtn busy={busy==='variation'} icon="🎨" title="Gerar variação" desc="gpt-image-1 recria com fundo branco de estúdio" onClick={() => apply(window.MLImgUtils.generateVariation,'variation')}/>
+          </div>
+        )}
+      </>)}
     </div>
   );
 }
 
 function ImgBtn({ children, onClick, busy }) {
   return (
-    <button onClick={onClick} disabled={busy}
+    <button onClick={onClick} disabled={!!busy}
       style={{padding:'5px 9px', border:'1px solid #FFE9A8', borderRadius:5, background: busy ? '#FFE9A8' : '#FFF8E1', fontSize:11, fontWeight:600, cursor: busy ? 'wait' : 'pointer', color:'#7A5A00'}}>
       {busy ? '...' : children}
+    </button>
+  );
+}
+
+function OpenAIImgBtn({ icon, title, desc, onClick, busy }) {
+  return (
+    <button onClick={onClick} disabled={!!busy} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 11px', border:'1px solid #d0f0e8', borderRadius:8, background: busy ? '#e6f9f4' : '#f0fdf9', cursor: busy ? 'wait' : 'pointer', textAlign:'left', width:'100%', opacity: busy ? 0.75 : 1}}>
+      <span style={{fontSize:16, flexShrink:0}}>{busy ? '⏳' : icon}</span>
+      <div>
+        <div style={{fontSize:12, fontWeight:700, color:'#065f46'}}>{busy ? 'Processando...' : title}</div>
+        <div style={{fontSize:10, color:'#6b7280', marginTop:1}}>{desc}</div>
+      </div>
     </button>
   );
 }
@@ -567,6 +669,11 @@ function App() {
   const [productName, setProductName] = useState(TWEAK_DEFAULTS.productName);
   const [storeName, setStoreName] = useState(TWEAK_DEFAULTS.storeName);
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
+  const [apiKey, setApiKey] = React.useState(() => {
+    const saved = localStorage.getItem('openai_api_key') || '';
+    if (saved) window.OPENAI_API_KEY = saved;
+    return saved;
+  });
 
   const set = (k, v) => setData(prev => ({...prev, [k]: v}));
   const merge = (patch) => setData(prev => ({...prev, ...patch}));
@@ -594,6 +701,7 @@ function App() {
         </div>
       </header>
 
+      <OpenAIKeyBanner apiKey={apiKey} setApiKey={setApiKey}/>
       <UploadZone onGenerate={merge} productName={productName} setProductName={setProductName}/>
 
       <div className="grid">
