@@ -111,14 +111,9 @@ const INITIAL = {
    AUTO-GENERATE: dado N fotos, gera os crops para os 5 templates
    ============================================================= */
 async function autoGenerate(uploadedDataUrls) {
-  // uploadedDataUrls: array de data URLs do produto
   const out = {};
   if (!uploadedDataUrls.length) return out;
-
-  // Foto principal: a primeira
   out.mainImg = uploadedDataUrls[0];
-
-  // Lifestyle (Foto 5/6): se houver 3+ fotos, usa a 3ª; senão tenta a 2ª; senão deixa vazio
   if (uploadedDataUrls.length >= 3) {
     out.p5_lifestyle = uploadedDataUrls[2];
     out.p6_lifestyle = uploadedDataUrls[2];
@@ -126,17 +121,121 @@ async function autoGenerate(uploadedDataUrls) {
     out.p5_lifestyle = uploadedDataUrls[1];
     out.p6_lifestyle = uploadedDataUrls[1];
   }
-
-  // 3 crops circulares para a Foto 1: zooms da imagem principal
   const crops = await makeCircleCrops(uploadedDataUrls[0]);
   out.p1_circles = crops.map(img => ({ img }));
+  if (uploadedDataUrls.length >= 2) out.p1_corner4 = uploadedDataUrls[1];
+  return out;
+}
 
-  // 4º canto (variante C): usa a 2ª foto enviada se existir
-  if (uploadedDataUrls.length >= 2) {
-    out.p1_corner4 = uploadedDataUrls[1];
+// ---------------------------------------------------------------------------
+// Helpers para gpt-image-1
+// ---------------------------------------------------------------------------
+function dataUrlToBlob(dataUrl) {
+  const [hdr, b64] = dataUrl.split(',');
+  const mime = hdr.match(/:(.*?);/)[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+async function toPngBlob(dataUrl, maxPx = 1024) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      c.toBlob(resolve, 'image/png');
+    };
+    img.src = dataUrl;
+  });
+}
+
+async function callGptImage1(imageDataUrl, prompt) {
+  const key = (window.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || '').trim();
+  if (!key) throw new Error('Configure sua chave OpenAI primeiro.');
+
+  const blob = await toPngBlob(imageDataUrl, 1024);
+  const form = new FormData();
+  form.append('model', 'gpt-image-1');
+  form.append('image', blob, 'product.png');
+  form.append('prompt', prompt);
+  form.append('n', '1');
+  form.append('size', '1024x1024');
+  form.append('quality', 'high');
+
+  const resp = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error?.message || `OpenAI ${resp.status}`);
+  }
+  const json = await resp.json();
+  const b64 = json.data[0].b64_json;
+  return `data:image/png;base64,${b64}`;
+}
+
+// Prompts e lógica por slot
+const SLOT_PROMPTS = {
+  1: () => `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, no watermark, clean isolated product shot.`,
+  2: (n) => `Extreme close-up macro product photography of important detail ${n}, studio white background, sharp focus, professional lighting, no text, isolated on white.`,
+  3: () => `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, clean shot — same as the reference product image.`,
+  4: () => `Lifestyle product photography showing the product in real-world use, natural environment, person interacting with product, warm natural lighting, professional photography, no text.`,
+};
+
+async function generatePhotoWithAI(slotNum, sourceImgs, closeupIndex = 0) {
+  // sourceImgs: array de dataURLs que o usuário subiu
+  const src = sourceImgs[0]; // sempre usa a primeira como base
+  if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
+
+  if (slotNum === 1) {
+    const img = await callGptImage1(src, SLOT_PROMPTS[1]());
+    return { mainImg: img };
   }
 
-  return out;
+  if (slotNum === 2) {
+    // Gera 2 closes para os círculos p1_circles[0] e p1_circles[1]
+    const [c1, c2] = await Promise.all([
+      callGptImage1(src, SLOT_PROMPTS[2](1)),
+      callGptImage1(src, SLOT_PROMPTS[2](2)),
+    ]);
+    return {
+      p1_circles: [{ img: c1 }, { img: c2 }, { img: '' }],
+      p1e_spot: { img: c1, x: 60, y: 58, size: 340 },
+    };
+  }
+
+  if (slotNum === 3) {
+    // Produto estúdio + 2 closes para os slots de feature da foto 3
+    const [hero, cl1, cl2] = await Promise.all([
+      callGptImage1(src, SLOT_PROMPTS[3]()),
+      callGptImage1(src, SLOT_PROMPTS[2](1)),
+      callGptImage1(src, SLOT_PROMPTS[2](2)),
+    ]);
+    return {
+      mainImg: hero,
+      p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }],
+    };
+  }
+
+  if (slotNum === 4) {
+    const img = await callGptImage1(src, SLOT_PROMPTS[4]());
+    return { p5_lifestyle: img, p6_lifestyle: img };
+  }
+
+  if (slotNum === 5 || slotNum === 6) {
+    // Miniatura = copia mainImg existente, sem custo
+    return {}; // o mainImg já está nos dados
+  }
+
+  return {};
 }
 
 // Carrega imagem e retorna 3 crops zoom de regiões diferentes
@@ -290,6 +389,62 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
   return JSON.parse(m[0]);
 }
 
+/* ============== Botão de geração IA por slot ============== */
+function AIGenBtn({ slotNum, rawImgs, onResult, label, title }) {
+  const [status, setStatus] = React.useState('idle'); // idle | loading | done | error
+  const [msg, setMsg] = React.useState('');
+
+  const run = async () => {
+    if (!rawImgs || rawImgs.length === 0) {
+      setMsg('Suba pelo menos 1 foto primeiro.');
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+      return;
+    }
+    setStatus('loading');
+    setMsg('');
+    try {
+      const patch = await generatePhotoWithAI(slotNum, rawImgs);
+      onResult(patch);
+      setStatus('done');
+      setMsg('✓ Aplicado!');
+      setTimeout(() => setStatus('idle'), 2500);
+    } catch (e) {
+      setStatus('error');
+      setMsg(e.message);
+      setTimeout(() => setStatus('idle'), 5000);
+    }
+  };
+
+  const colors = {
+    idle:    { bg: '#f0fdf9', border: '#6ee7b7', color: '#065f46' },
+    loading: { bg: '#e6f9f4', border: '#6ee7b7', color: '#065f46' },
+    done:    { bg: '#dcfce7', border: '#86efac', color: '#14532d' },
+    error:   { bg: '#fef2f2', border: '#fca5a5', color: '#991b1b' },
+  };
+  const c = colors[status];
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button
+        onClick={run}
+        disabled={status === 'loading'}
+        title={title}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '5px 12px', border: `1px solid ${c.border}`,
+          borderRadius: 7, background: c.bg, color: c.color,
+          fontSize: 11, fontWeight: 700, cursor: status === 'loading' ? 'wait' : 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {status === 'loading' ? '⏳' : '✦'} {status === 'loading' ? 'Gerando…' : label}
+      </button>
+      {msg && <span style={{ fontSize: 11, color: c.color }}>{msg}</span>}
+    </div>
+  );
+}
+
 /* ============== Barra de zoom do produto por slot ============== */
 function ZoomBar({ value, onChange }) {
   const pct = Math.round((value || 1) * 100);
@@ -398,7 +553,7 @@ function OpenAIKeyBanner({ apiKey, setApiKey }) {
 }
 
 /* ============== Upload zone ============== */
-function UploadZone({ onGenerate, productName, setProductName }) {
+function UploadZone({ onGenerate, productName, setProductName, onRawFiles }) {
   const [files, setFiles] = useState([]);
   const [category, setCategory] = useState('Ferramentas');
   const [extras, setExtras] = useState('');
@@ -416,6 +571,7 @@ function UploadZone({ onGenerate, productName, setProductName }) {
     }))).then(async (urls) => {
       const merged = [...files, ...urls].slice(0, 5);
       setFiles(merged);
+      if (onRawFiles) onRawFiles(merged);
       // Aplica imagens direto, sem precisar clicar em nada
       const imgPatch = await autoGenerate(merged);
       if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
@@ -427,6 +583,7 @@ function UploadZone({ onGenerate, productName, setProductName }) {
     setFiles(next);
     // Reaplicar com as fotos restantes
     if (next.length > 0) autoGenerate(next).then(patch => onGenerate(patch));
+    if (onRawFiles) onRawFiles(next);
   };
 
   const runAI = async () => {
@@ -800,7 +957,7 @@ function App() {
   const [productName, setProductName] = useState(TWEAK_DEFAULTS.productName);
   const [storeName, setStoreName] = useState(TWEAK_DEFAULTS.storeName);
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
-  const [apiKey, setApiKey] = React.useState(() => {
+  const [rawFiles, setRawFiles] = React.useState([]);
     const saved = localStorage.getItem('openai_api_key') || '';
     if (saved) window.OPENAI_API_KEY = saved;
     return saved;
@@ -837,34 +994,61 @@ function App() {
       </header>
 
       <OpenAIKeyBanner apiKey={apiKey} setApiKey={setApiKey}/>
-      <UploadZone onGenerate={merge} productName={productName} setProductName={setProductName}/>
+      <UploadZone onGenerate={merge} productName={productName} setProductName={setProductName} onRawFiles={setRawFiles}/>
 
       <div className="grid">
         <Slot num={1} title="Capa com destaques" productName={productName} bg={data.bg_mode ? data.bg_foto1 : null}
           extra={<>
             <VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>
-            <div style={{marginTop:4}}><ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/></div>
+            <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+              <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
+              <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
+                label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"/>
+            </div>
           </>}>
           <MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
+
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
-          extra={<ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>}>
+          extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
+            <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
+              label="Gerar 2 closes" title="Gera 2 closes do produto para os círculos de detalhe"/>
+          </div>}>
           <MLPhoto2 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
+
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
-          extra={<ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>}>
+          extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
+            <AIGenBtn slotNum={3} rawImgs={rawFiles} onResult={merge}
+              label="Gerar hero + 2 closes" title="Gera foto hero + 2 closes para essa foto"/>
+          </div>}>
           <MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
+
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
-          extra={<ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>}>
+          extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
+            <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
+              label="Gerar lifestyle" title="Gera foto do produto em uso para lifestyle"/>
+          </div>}>
           <MLPhoto4 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
+
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
-          extra={<ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>}>
+          extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>
+            <span style={{fontSize:11, color:'#6b7280'}}>Usa a foto da Foto 1 como miniatura</span>
+          </div>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
+
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
-          extra={<ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>}>
+          extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+            <ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>
+            <span style={{fontSize:11, color:'#6b7280'}}>Usa a foto da Foto 1 como miniatura</span>
+          </div>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
       </div>
