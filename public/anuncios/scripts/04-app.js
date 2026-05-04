@@ -373,7 +373,7 @@ function OpenAIKeyBanner({ apiKey, setApiKey }) {
 }
 
 /* ============== Upload zone ============== */
-function UploadZone({ onGenerate, onApplyAI, productName, setProductName }) {
+function UploadZone({ onGenerate, productName, setProductName }) {
   const [files, setFiles] = useState([]);
   const [category, setCategory] = useState('Ferramentas');
   const [extras, setExtras] = useState('');
@@ -381,51 +381,51 @@ function UploadZone({ onGenerate, onApplyAI, productName, setProductName }) {
   const [aiStatus, setAiStatus] = useState('');
   const inputRef = useRef(null);
 
+  // Carrega arquivos, converte para dataURL e aplica imagens imediatamente
   const handleFiles = (list) => {
     const arr = Array.from(list).slice(0, 5);
     Promise.all(arr.map(f => new Promise((res) => {
       const r = new FileReader();
       r.onload = (e) => res(e.target.result);
       r.readAsDataURL(f);
-    }))).then(urls => setFiles(prev => [...prev, ...urls].slice(0, 5)));
+    }))).then(async (urls) => {
+      const merged = [...files, ...urls].slice(0, 5);
+      setFiles(merged);
+      // Aplica imagens direto, sem precisar clicar em nada
+      const imgPatch = await autoGenerate(merged);
+      if (Object.keys(imgPatch).length > 0) onGenerate(imgPatch);
+    });
   };
 
-  const handleAutoGenerateAll = async () => {
-    setAiStatus('Processando imagens...');
-    const imgPatch = files.length > 0 ? await autoGenerate(files) : {};
+  const removeFile = (i) => {
+    const next = files.filter((_, j) => j !== i);
+    setFiles(next);
+    // Reaplicar com as fotos restantes
+    if (next.length > 0) autoGenerate(next).then(patch => onGenerate(patch));
+  };
 
-    if (productName && productName.trim()) {
-      setAiLoading(true);
-      setAiStatus('🤖 IA gerando títulos e textos...');
-      try {
-        const aiPatch = await generateTextsWithAI(productName, category, extras);
-        onGenerate({ ...imgPatch, ...aiPatch });
-        setAiStatus('✅ Pronto! Textos e imagens aplicados.');
-      } catch (e) {
-        onGenerate(imgPatch);
-        setAiStatus('⚠️ Imagens aplicadas, mas IA falhou: ' + e.message);
-      } finally {
-        setAiLoading(false);
-        setTimeout(() => setAiStatus(''), 4000);
-      }
-    } else if (Object.keys(imgPatch).length > 0) {
-      onGenerate(imgPatch);
-      setAiStatus('✅ Imagens aplicadas (sem IA — preencha o nome do produto para gerar textos).');
+  const runAI = async () => {
+    if (!productName?.trim()) return;
+    setAiLoading(true);
+    setAiStatus('🤖 IA gerando títulos e textos...');
+    try {
+      const aiPatch = await generateTextsWithAI(productName, category, extras);
+      onGenerate(aiPatch);
+      setAiStatus('✅ Textos aplicados!');
+    } catch (e) {
+      setAiStatus('❌ ' + e.message);
+    } finally {
+      setAiLoading(false);
       setTimeout(() => setAiStatus(''), 4000);
     }
   };
 
   return (
     <div className="uploader">
-      <h2>🚀 Auto-gerar com IA</h2>
-      <p>Preencha o nome do produto e envie 2-3 fotos. A IA escreve todos os títulos e textos automaticamente, e os crops circulares da capa são gerados das suas fotos.</p>
+      <h2>📸 Fotos do produto</h2>
+      <p>Arraste ou selecione as fotos — elas são aplicadas automaticamente nos templates. Para gerar os textos com IA, preencha o nome e clique em "Gerar textos".</p>
 
-      <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:14}}>
-        <Field label="Nome do produto *" value={productName} onChange={setProductName}/>
-        <Field label="Categoria" value={category} onChange={setCategory}/>
-      </div>
-      <Field label="Detalhes técnicos opcionais (peso suportado, dimensões, material...)" value={extras} onChange={setExtras} multi/>
-
+      {/* Drop zone */}
       <div
         className="drop"
         onClick={() => inputRef.current.click()}
@@ -438,16 +438,19 @@ function UploadZone({ onGenerate, onApplyAI, productName, setProductName }) {
         }}
       >
         <div style={{fontSize:14, fontWeight:600, color:'#666'}}>
-          {files.length === 0 ? 'Clique ou arraste fotos aqui (até 5) — opcional' : `${files.length} foto(s) carregada(s)`}
+          {files.length === 0
+            ? 'Clique ou arraste as fotos aqui (até 5)'
+            : `${files.length} foto(s) — clique para adicionar mais`}
         </div>
         <input ref={inputRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={(e) => handleFiles(e.target.files)}/>
       </div>
 
+      {/* Thumbnails */}
       {files.length > 0 && (
         <div className="drop-grid">
           {files.map((url, i) => (
             <div key={i} className="drop-thumb" style={{backgroundImage: `url(${url})`}}>
-              <button className="drop-thumb-rm" onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter((_, j) => j !== i)); }}>×</button>
+              <button className="drop-thumb-rm" onClick={(e) => { e.stopPropagation(); removeFile(i); }}>×</button>
               <div style={{position:'absolute', bottom:4, left:4, background:'rgba(0,0,0,.7)', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, fontWeight:600}}>
                 {i === 0 ? 'principal' : i === 2 ? 'lifestyle' : `extra ${i}`}
               </div>
@@ -456,31 +459,26 @@ function UploadZone({ onGenerate, onApplyAI, productName, setProductName }) {
         </div>
       )}
 
-      {aiStatus && (
-        <div style={{marginTop:14, padding:'10px 14px', background: aiLoading ? '#FFF8E1' : '#E8F3EC', border:`1px solid ${aiLoading ? '#FFE9A8' : '#A0E548'}`, borderRadius:8, fontSize:13, fontWeight:500, color: aiLoading ? '#8B6F00' : '#1F7A3A'}}>
-          {aiStatus}
+      {/* Separador IA */}
+      <div style={{marginTop:20, paddingTop:16, borderTop:'1px solid #eee'}}>
+        <div style={{fontSize:13, fontWeight:700, color:'#1a1a1a', marginBottom:10}}>🤖 Gerar textos com IA <span style={{fontWeight:400, color:'#888', fontSize:12}}>(opcional)</span></div>
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:10, marginBottom:10}}>
+          <Field label="Nome do produto" value={productName} onChange={setProductName}/>
+          <Field label="Categoria" value={category} onChange={setCategory}/>
         </div>
-      )}
+        <Field label="Detalhes técnicos (dimensões, material, capacidade...)" value={extras} onChange={setExtras} multi/>
 
-      <div style={{display:'flex', gap:10, marginTop:18, justifyContent:'flex-end', flexWrap:'wrap'}}>
-        <button className="btn" disabled={files.length === 0} onClick={() => setFiles([])}>Limpar fotos</button>
-        <button className="btn" disabled={aiLoading || !productName?.trim()} onClick={async () => {
-          setAiLoading(true);
-          setAiStatus('🤖 IA gerando títulos e textos...');
-          try {
-            const aiPatch = await generateTextsWithAI(productName, category, extras);
-            onGenerate(aiPatch);
-            setAiStatus('✅ Textos atualizados!');
-          } catch (e) {
-            setAiStatus('❌ IA falhou: ' + e.message);
-          } finally {
-            setAiLoading(false);
-            setTimeout(() => setAiStatus(''), 4000);
-          }
-        }}>🤖 Só textos (IA)</button>
-        <button className="btn primary" disabled={aiLoading || (files.length === 0 && !productName?.trim())} onClick={handleAutoGenerateAll}>
-          {aiLoading ? 'Gerando...' : '✨ Gerar tudo (IA + fotos)'}
-        </button>
+        {aiStatus && (
+          <div style={{margin:'10px 0', padding:'10px 14px', background: aiLoading ? '#FFF8E1' : '#E8F3EC', border:`1px solid ${aiLoading ? '#FFE9A8' : '#A0E548'}`, borderRadius:8, fontSize:13, fontWeight:500, color: aiLoading ? '#8B6F00' : '#1F7A3A'}}>
+            {aiStatus}
+          </div>
+        )}
+
+        <div style={{display:'flex', justifyContent:'flex-end', marginTop:10}}>
+          <button className="btn primary" disabled={aiLoading || !productName?.trim()} onClick={runAI}>
+            {aiLoading ? 'Gerando...' : '✨ Gerar textos (IA)'}
+          </button>
+        </div>
       </div>
     </div>
   );
