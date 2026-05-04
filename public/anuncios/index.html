@@ -388,6 +388,16 @@ html, body {
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
+/* Modo export — esconde todos artefatos de edição */
+.exporting, .exporting * {
+  outline: none !important;
+  outline-offset: 0 !important;
+  caret-color: transparent !important;
+  cursor: default !important;
+}
+.exporting [data-export-hide] {
+  display: none !important;
+}
 </style>
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>

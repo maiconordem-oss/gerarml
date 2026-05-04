@@ -64,24 +64,25 @@ async function exportCanvas(node, filename) {
     return;
   }
   try {
-    // Temporariamente reseta o scale do canvas para capturar em tamanho real
+    // Reseta scale e adiciona classe que oculta artefatos de edição
     const prevTransform = node.style.transform;
-    const prevPosition = node.style.position;
     node.style.transform = 'scale(1)';
     node.style.transformOrigin = 'top left';
+    node.classList.add('exporting');
+
+    // Pequena pausa para o browser aplicar os estilos
+    await new Promise(r => setTimeout(r, 60));
 
     const dataUrl = await window.htmlToImage.toPng(node, {
       width: 1200,
       height: 1540,
       pixelRatio: 1,
       cacheBust: true,
-      skipFonts: false,
-      includeQueryParams: true,
     });
 
-    // Restaura o scale visual
+    // Restaura
     node.style.transform = prevTransform;
-    node.style.position = prevPosition;
+    node.classList.remove('exporting');
 
     const a = document.createElement('a');
     a.href = dataUrl;
@@ -130,7 +131,8 @@ function Draggable({ id, data, set, children, defaultPos = { x: 0, y: 0 }, enabl
     outlineOffset: enabled ? 4 : 0,
   };
   return (
-    <div ref={ref} style={wrapperStyle} onMouseDown={onMouseDown}>
+    <div ref={ref} style={wrapperStyle} onMouseDown={onMouseDown}
+      data-edit-outline={enabled ? 'true' : undefined}>
       {children}
     </div>
   );
