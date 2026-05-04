@@ -183,28 +183,49 @@ async function callGptImage1(imageDataUrl, prompt) {
 }
 
 // Prompts e lógica por slot
-const SLOT_PROMPTS = {
-  1: () => `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, no watermark, clean isolated product shot.`,
-  2: (n) => `Extreme close-up macro product photography of important detail ${n}, studio white background, sharp focus, professional lighting, no text, isolated on white.`,
-  3: () => `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, clean shot — same as the reference product image.`,
-  4: () => `Lifestyle product photography showing the product in real-world use, natural environment, person interacting with product, warm natural lighting, professional photography, no text.`,
+const LS_PROMPTS_KEY = 'gerarml_prompts';
+
+const DEFAULT_PROMPTS = {
+  1: `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, no watermark, clean isolated product shot.`,
+  '2a': `Extreme close-up macro product photography of an important detail (left side / top area), studio white background, sharp focus, professional lighting, no text, isolated on white.`,
+  '2b': `Extreme close-up macro product photography of an important detail (right side / bottom area), studio white background, sharp focus, professional lighting, no text, isolated on white.`,
+  3: `Professional e-commerce product photography, studio white background, soft even lighting, slight shadow at base, high resolution, product centered, no text, clean shot — same as the reference product image.`,
+  4: `Lifestyle product photography showing the product in real-world use, natural environment, person interacting with product, warm natural lighting, professional photography, no text.`,
 };
 
-async function generatePhotoWithAI(slotNum, sourceImgs, closeupIndex = 0) {
-  // sourceImgs: array de dataURLs que o usuário subiu
-  const src = sourceImgs[0]; // sempre usa a primeira como base
+function loadPrompts() {
+  try {
+    const saved = localStorage.getItem(LS_PROMPTS_KEY);
+    if (saved) return { ...DEFAULT_PROMPTS, ...JSON.parse(saved) };
+  } catch (_) {}
+  return { ...DEFAULT_PROMPTS };
+}
+
+function savePrompts(prompts) {
+  try { localStorage.setItem(LS_PROMPTS_KEY, JSON.stringify(prompts)); } catch (_) {}
+}
+
+// Prompts reativos — objeto mutável compartilhado, atualizado pelo editor
+let _activePrompts = loadPrompts();
+function getPrompt(key) { return _activePrompts[key] || DEFAULT_PROMPTS[key] || ''; }
+function setPromptAndSave(key, value) {
+  _activePrompts = { ..._activePrompts, [key]: value };
+  savePrompts(_activePrompts);
+}
+
+async function generatePhotoWithAI(slotNum, sourceImgs) {
+  const src = sourceImgs[0];
   if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
 
   if (slotNum === 1) {
-    const img = await callGptImage1(src, SLOT_PROMPTS[1]());
+    const img = await callGptImage1(src, getPrompt(1));
     return { mainImg: img };
   }
 
   if (slotNum === 2) {
-    // Gera 2 closes para os círculos p1_circles[0] e p1_circles[1]
     const [c1, c2] = await Promise.all([
-      callGptImage1(src, SLOT_PROMPTS[2](1)),
-      callGptImage1(src, SLOT_PROMPTS[2](2)),
+      callGptImage1(src, getPrompt('2a')),
+      callGptImage1(src, getPrompt('2b')),
     ]);
     return {
       p1_circles: [{ img: c1 }, { img: c2 }, { img: '' }],
@@ -213,26 +234,17 @@ async function generatePhotoWithAI(slotNum, sourceImgs, closeupIndex = 0) {
   }
 
   if (slotNum === 3) {
-    // Produto estúdio + 2 closes para os slots de feature da foto 3
     const [hero, cl1, cl2] = await Promise.all([
-      callGptImage1(src, SLOT_PROMPTS[3]()),
-      callGptImage1(src, SLOT_PROMPTS[2](1)),
-      callGptImage1(src, SLOT_PROMPTS[2](2)),
+      callGptImage1(src, getPrompt(3)),
+      callGptImage1(src, getPrompt('2a')),
+      callGptImage1(src, getPrompt('2b')),
     ]);
-    return {
-      mainImg: hero,
-      p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }],
-    };
+    return { mainImg: hero, p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }] };
   }
 
   if (slotNum === 4) {
-    const img = await callGptImage1(src, SLOT_PROMPTS[4]());
+    const img = await callGptImage1(src, getPrompt(4));
     return { p5_lifestyle: img, p6_lifestyle: img };
-  }
-
-  if (slotNum === 5 || slotNum === 6) {
-    // Miniatura = copia mainImg existente, sem custo
-    return {}; // o mainImg já está nos dados
   }
 
   return {};
@@ -389,10 +401,30 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
   return JSON.parse(m[0]);
 }
 
-/* ============== Botão de geração IA por slot ============== */
-function AIGenBtn({ slotNum, rawImgs, onResult, label, title }) {
-  const [status, setStatus] = React.useState('idle'); // idle | loading | done | error
+/* ============== Botão de geração IA por slot com editor de prompt ============== */
+function AIGenBtn({ slotNum, rawImgs, onResult, label, title, promptKeys }) {
+  const [status, setStatus] = React.useState('idle');
   const [msg, setMsg] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  // Estado local dos prompts editados (inicializa do _activePrompts)
+  const [drafts, setDrafts] = React.useState(() =>
+    Object.fromEntries((promptKeys || []).map(k => [k, getPrompt(k)]))
+  );
+  const [saved, setSaved] = React.useState(false);
+
+  const handleSave = () => {
+    (promptKeys || []).forEach(k => setPromptAndSave(k, drafts[k]));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+
+  const handleReset = () => {
+    const reset = Object.fromEntries((promptKeys || []).map(k => [k, DEFAULT_PROMPTS[k] || '']));
+    setDrafts(reset);
+    (promptKeys || []).forEach(k => setPromptAndSave(k, DEFAULT_PROMPTS[k] || ''));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
 
   const run = async () => {
     if (!rawImgs || rawImgs.length === 0) {
@@ -401,17 +433,14 @@ function AIGenBtn({ slotNum, rawImgs, onResult, label, title }) {
       setTimeout(() => setStatus('idle'), 3000);
       return;
     }
-    setStatus('loading');
-    setMsg('');
+    setStatus('loading'); setMsg('');
     try {
       const patch = await generatePhotoWithAI(slotNum, rawImgs);
       onResult(patch);
-      setStatus('done');
-      setMsg('✓ Aplicado!');
+      setStatus('done'); setMsg('✓ Aplicado!');
       setTimeout(() => setStatus('idle'), 2500);
     } catch (e) {
-      setStatus('error');
-      setMsg(e.message);
+      setStatus('error'); setMsg(e.message);
       setTimeout(() => setStatus('idle'), 5000);
     }
   };
@@ -424,23 +453,76 @@ function AIGenBtn({ slotNum, rawImgs, onResult, label, title }) {
   };
   const c = colors[status];
 
+  const LABELS = {
+    1: 'Hero (estúdio)',
+    '2a': 'Close 1',
+    '2b': 'Close 2',
+    3: 'Produto (foto 3)',
+    4: 'Lifestyle',
+  };
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button
-        onClick={run}
-        disabled={status === 'loading'}
-        title={title}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '5px 12px', border: `1px solid ${c.border}`,
-          borderRadius: 7, background: c.bg, color: c.color,
-          fontSize: 11, fontWeight: 700, cursor: status === 'loading' ? 'wait' : 'pointer',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {status === 'loading' ? '⏳' : '✦'} {status === 'loading' ? 'Gerando…' : label}
-      </button>
-      {msg && <span style={{ fontSize: 11, color: c.color }}>{msg}</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Botão principal */}
+        <button onClick={run} disabled={status === 'loading'} title={title}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+            border: `1px solid ${c.border}`, borderRadius: 7, background: c.bg, color: c.color,
+            fontSize: 11, fontWeight: 700, cursor: status === 'loading' ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+          {status === 'loading' ? '⏳' : '✦'} {status === 'loading' ? 'Gerando…' : label}
+        </button>
+
+        {/* Toggle do editor de prompt */}
+        {promptKeys && promptKeys.length > 0 && (
+          <button onClick={() => setOpen(v => !v)}
+            title="Editar prompts desta geração"
+            style={{ padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 7,
+              background: open ? '#f3f4f6' : 'white', fontSize: 11, cursor: 'pointer',
+              color: open ? '#374151' : '#9ca3af', fontWeight: 600 }}>
+            {open ? '▲ prompt' : '▼ prompt'}
+          </button>
+        )}
+
+        {msg && <span style={{ fontSize: 11, color: c.color, fontWeight: 500 }}>{msg}</span>}
+      </div>
+
+      {/* Painel de edição de prompts */}
+      {open && promptKeys && (
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10,
+          padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {promptKeys.map(k => (
+            <div key={k}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                {LABELS[k] || k}
+                {drafts[k] !== DEFAULT_PROMPTS[k] && (
+                  <span style={{ marginLeft: 6, color: '#f59e0b', fontSize: 10 }}>● editado</span>
+                )}
+              </div>
+              <textarea
+                value={drafts[k] || ''}
+                onChange={e => setDrafts(prev => ({ ...prev, [k]: e.target.value }))}
+                rows={3}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db',
+                  borderRadius: 7, fontSize: 12, fontFamily: 'ui-monospace, monospace',
+                  resize: 'vertical', lineHeight: 1.5, color: '#111827' }}
+              />
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={handleReset}
+              style={{ padding: '5px 12px', border: '1px solid #e5e7eb', borderRadius: 6,
+                background: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#6b7280' }}>
+              Restaurar padrão
+            </button>
+            <button onClick={handleSave}
+              style={{ padding: '5px 14px', border: '1px solid #6ee7b7', borderRadius: 6,
+                background: saved ? '#dcfce7' : '#f0fdf9', fontSize: 11, fontWeight: 700,
+                cursor: 'pointer', color: '#065f46' }}>
+              {saved ? '✓ Salvo!' : '💾 Salvar prompt'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1003,7 +1085,8 @@ function App() {
             <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
               <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
-                label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"/>
+                label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"
+                promptKeys={[1]}/>
             </div>
           </>}>
           <MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/>
@@ -1013,7 +1096,8 @@ function App() {
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
-              label="Gerar 2 closes" title="Gera 2 closes do produto para os círculos de detalhe"/>
+              label="Gerar 2 closes" title="Gera 2 closes do produto para os círculos de detalhe"
+              promptKeys={['2a','2b']}/>
           </div>}>
           <MLPhoto2 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
@@ -1022,7 +1106,8 @@ function App() {
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
             <AIGenBtn slotNum={3} rawImgs={rawFiles} onResult={merge}
-              label="Gerar hero + 2 closes" title="Gera foto hero + 2 closes para essa foto"/>
+              label="Gerar hero + 2 closes" title="Gera foto hero + 2 closes para essa foto"
+              promptKeys={[3,'2a','2b']}/>
           </div>}>
           <MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
@@ -1031,7 +1116,8 @@ function App() {
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
-              label="Gerar lifestyle" title="Gera foto do produto em uso para lifestyle"/>
+              label="Gerar lifestyle" title="Gera foto do produto em uso para lifestyle"
+              promptKeys={[4]}/>
           </div>}>
           <MLPhoto4 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
