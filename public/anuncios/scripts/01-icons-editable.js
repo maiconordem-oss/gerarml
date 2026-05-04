@@ -64,23 +64,33 @@ async function exportCanvas(node, filename) {
     return;
   }
   try {
-    // Reseta scale e adiciona classe que oculta artefatos de edição
+    // Aguarda todas as fontes carregarem
+    await document.fonts.ready;
+
+    // Reseta scale e ativa modo export (remove outlines de edição)
     const prevTransform = node.style.transform;
     node.style.transform = 'scale(1)';
     node.style.transformOrigin = 'top left';
     node.classList.add('exporting');
 
-    // Pequena pausa para o browser aplicar os estilos
-    await new Promise(r => setTimeout(r, 60));
+    // Pausa para o browser repintar com os estilos de export
+    await new Promise(r => setTimeout(r, 80));
+
+    // Coleta as fontes já carregadas na página para embutir no PNG
+    let fontEmbedCSS = '';
+    try {
+      fontEmbedCSS = await window.htmlToImage.getFontEmbedCSS(node);
+    } catch (_) {}
 
     const dataUrl = await window.htmlToImage.toPng(node, {
       width: 1200,
       height: 1540,
       pixelRatio: 1,
       cacheBust: true,
+      fontEmbedCSS,
     });
 
-    // Restaura
+    // Restaura estado visual
     node.style.transform = prevTransform;
     node.classList.remove('exporting');
 
