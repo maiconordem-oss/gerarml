@@ -501,12 +501,13 @@ function TweaksUI({ data, set, productName, setProductName, storeName, setStoreN
           <SliderField label={`Foto 5: ${data.p5_mini_size}px`} value={data.p5_mini_size} min={140} max={420} onChange={(v) => set('p5_mini_size', v)}/>
           <SliderField label={`Foto 6: ${data.p6_mini_size}px`} value={data.p6_mini_size} min={140} max={420} onChange={(v) => set('p6_mini_size', v)}/>
           <SectionLabel>Imagens de fundo (modo fundo)</SectionLabel>
-          <ImgField label="Fundo Foto 1" value={data.bg_foto1} onChange={(v) => set('bg_foto1', v)}/>
-          <ImgField label="Fundo Foto 2" value={data.bg_foto2} onChange={(v) => set('bg_foto2', v)}/>
-          <ImgField label="Fundo Foto 3" value={data.bg_foto3} onChange={(v) => set('bg_foto3', v)}/>
-          <ImgField label="Fundo Foto 4" value={data.bg_foto4} onChange={(v) => set('bg_foto4', v)}/>
-          <ImgField label="Fundo Foto 5" value={data.bg_foto5} onChange={(v) => set('bg_foto5', v)}/>
-          <ImgField label="Fundo Foto 6" value={data.bg_foto6} onChange={(v) => set('bg_foto6', v)}/>
+          <BgSavedBanner data={data} set={set}/>
+          <ImgField label="Fundo Foto 1" value={data.bg_foto1} onChange={(v) => set('bg_foto1', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto1')}/>
+          <ImgField label="Fundo Foto 2" value={data.bg_foto2} onChange={(v) => set('bg_foto2', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto2')}/>
+          <ImgField label="Fundo Foto 3" value={data.bg_foto3} onChange={(v) => set('bg_foto3', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto3')}/>
+          <ImgField label="Fundo Foto 4" value={data.bg_foto4} onChange={(v) => set('bg_foto4', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto4')}/>
+          <ImgField label="Fundo Foto 5" value={data.bg_foto5} onChange={(v) => set('bg_foto5', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto5')}/>
+          <ImgField label="Fundo Foto 6" value={data.bg_foto6} onChange={(v) => set('bg_foto6', v)} saved={!!localStorage.getItem('gerarml_bg_bg_foto6')}/>
         </>)}
         {tab === 'text' && (<>
           <SectionLabel>Foto 2 — Características</SectionLabel>
@@ -550,7 +551,7 @@ function Field({ label, value, onChange, multi, maxLength }) {
   );
 }
 
-function ImgField({ label, value, onChange }) {
+function ImgField({ label, value, onChange, saved }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(null);
   const [section, setSection] = React.useState('local');
@@ -576,7 +577,7 @@ function ImgField({ label, value, onChange }) {
 
   return (
     <div style={{marginBottom:14}}>
-      <div style={{fontSize:11, fontWeight:600, color:'#666', marginBottom:4}}>{label}</div>
+      <div style={{fontSize:11, fontWeight:600, color:'#666', marginBottom:4, display:'flex', alignItems:'center', gap:6}}>{label}{saved && <span style={{fontSize:10, fontWeight:700, color:'#166534', background:'#dcfce7', padding:'1px 6px', borderRadius:4}}>💾 salvo</span>}</div>
       <div style={{display:'flex', alignItems:'center', gap:8}}>
         <div style={{width:48, height:48, borderRadius:6, background:'#f0f0f0',
           backgroundImage: value ? `url(${value})` : 'none',
@@ -643,6 +644,48 @@ function SliderField({ label, value, min, max, onChange }) {
   );
 }
 
+const BG_KEYS = ['bg_foto1','bg_foto2','bg_foto3','bg_foto4','bg_foto5','bg_foto6'];
+const LS_BG_PREFIX = 'gerarml_bg_';
+
+function BgSavedBanner({ data, set }) {
+  const savedCount = BG_KEYS.filter(k => localStorage.getItem(LS_BG_PREFIX + k)).length;
+  const [cleared, setCleared] = React.useState(false);
+
+  if (savedCount === 0) {
+    return (
+      <div style={{fontSize:11, color:'#9ca3af', padding:'8px 10px', background:'#f9f9f9', borderRadius:6, marginBottom:10, border:'1px solid #eee'}}>
+        Nenhum fundo salvo ainda. Ao trocar uma imagem de fundo ela é salva automaticamente.
+      </div>
+    );
+  }
+
+  const handleClear = () => {
+    if (!confirm(`Limpar os ${savedCount} fundo(s) salvos? As fotos voltarão para os assets padrão.`)) return;
+    clearAllSavedBgs();
+    const patch = {};
+    BG_KEYS.forEach((k, i) => { patch[k] = `assets/bg-foto${i+1}.png`; });
+    BG_KEYS.forEach((k, i) => set(k, `assets/bg-foto${i+1}.png`));
+    setCleared(true);
+    setTimeout(() => setCleared(false), 2000);
+  };
+
+  return (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:8, marginBottom:10}}>
+      <div style={{display:'flex', alignItems:'center', gap:6}}>
+        <span style={{fontSize:14}}>💾</span>
+        <span style={{fontSize:11, fontWeight:600, color:'#166534'}}>
+          {cleared ? '✓ Fundos limpos' : `${savedCount} fundo(s) salvo(s) — carregam automaticamente`}
+        </span>
+      </div>
+      {!cleared && (
+        <button onClick={handleClear} style={{padding:'4px 10px', border:'1px solid #86efac', borderRadius:6, background:'white', fontSize:11, fontWeight:600, cursor:'pointer', color:'#6b7280'}}>
+          Limpar tudo
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SectionLabel({ children }) {
   return <div style={{fontFamily:'Montserrat', fontWeight:800, fontSize:11, letterSpacing:'.08em', textTransform:'uppercase', color:'#999', margin:'18px 0 8px', paddingTop:12, borderTop:'1px solid #f0f0f0'}}>{children}</div>;
 }
@@ -664,8 +707,32 @@ function useTweakMode() {
   return [active, setActive];
 }
 
+function loadSavedBgs() {
+  const patch = {};
+  for (const k of BG_KEYS) {
+    const v = localStorage.getItem(LS_BG_PREFIX + k);
+    if (v) patch[k] = v;
+  }
+  return patch;
+}
+
+function saveBg(k, v) {
+  if (v && v.startsWith('data:')) {
+    try { localStorage.setItem(LS_BG_PREFIX + k, v); } catch(e) {
+      // localStorage cheio (data URLs são grandes) — avisa mas não quebra
+      console.warn('localStorage cheio ao salvar fundo:', k, e);
+    }
+  } else {
+    localStorage.removeItem(LS_BG_PREFIX + k);
+  }
+}
+
+function clearAllSavedBgs() {
+  for (const k of BG_KEYS) localStorage.removeItem(LS_BG_PREFIX + k);
+}
+
 function App() {
-  const [data, setData] = useState(INITIAL);
+  const [data, setData] = useState(() => ({ ...INITIAL, ...loadSavedBgs() }));
   const [productName, setProductName] = useState(TWEAK_DEFAULTS.productName);
   const [storeName, setStoreName] = useState(TWEAK_DEFAULTS.storeName);
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
@@ -675,7 +742,11 @@ function App() {
     return saved;
   });
 
-  const set = (k, v) => setData(prev => ({...prev, [k]: v}));
+  const set = (k, v) => {
+    setData(prev => ({...prev, [k]: v}));
+    // Persiste automaticamente se for fundo
+    if (BG_KEYS.includes(k)) saveBg(k, v);
+  };
   const merge = (patch) => setData(prev => ({...prev, ...patch}));
 
   useEffect(() => {
