@@ -51,44 +51,133 @@ function Photo1A({ data, set, bgMode }) {
   );
 }
 
-/* ---- VARIANTE E: faixa lateral esquerda com 3 fotos ---- */
+/* ---- VARIANTE E: produto grande + círculos de detalhe sobrepostos ---- */
+/*
+  Layout inspirado nas imagens de referência:
+  - Produto ocupa quase toda a área
+  - 3 círculos com borda laranja sobrepostos (posições configuráveis)
+  - Cada círculo tem controles inline: trocar foto, aumentar/diminuir
+  - Posições padrão: inf-esq, inf-dir, sup-dir (como nas referências)
+*/
 function Photo1E({ data, set, bgMode }) {
-  const circles = data.p1_circles || [];
-  const STRIP = 300; // largura da faixa lateral
+  const { useState: uS, useRef: uR } = React;
+
+  // Estado dos círculos: posição X/Y (% da tela) e tamanho
+  const spots = data.p1e_spots || [
+    { img: '', x: 8,  y: 62, size: 300 },
+    { img: '', x: 62, y: 62, size: 300 },
+    { img: '', x: 62, y: 8,  size: 300 },
+  ];
+
+  const setSpot = (i, patch) => {
+    const next = spots.map((s, j) => j === i ? { ...s, ...patch } : s);
+    set('p1e_spots', next);
+  };
+
+  // Abre input file para trocar imagem do spot i
+  const fileRefs = [uR(null), uR(null), uR(null)];
+  const pickFile = (i) => fileRefs[i].current && fileRefs[i].current.click();
+  const onFile = (i, e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setSpot(i, { img: ev.target.result });
+    r.readAsDataURL(f);
+  };
+
+  // Drag para mover círculo (em px → converte para %)
+  const canvasW = 1200, canvasH = 1540;
+  const startDrag = (i, ev) => {
+    ev.stopPropagation();
+    const startX = ev.clientX, startY = ev.clientY;
+    const origX = spots[i].x, origY = spots[i].y;
+    const onMove = (e) => {
+      // escala: o canvas é escalado via CSS, precisamos do scale atual
+      const scale = parseFloat(document.querySelector('.canvas')?.style.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1');
+      const dx = (e.clientX - startX) / scale;
+      const dy = (e.clientY - startY) / scale;
+      const nx = Math.max(0, Math.min(85, origX + (dx / canvasW) * 100));
+      const ny = Math.max(0, Math.min(85, origY + (dy / canvasH) * 100));
+      setSpot(i, { x: nx, y: ny });
+    };
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const BORDER = 8;
+  const borderColor = '#E89522';
+
   return (
-    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#F4F4F4', position: 'relative', display: 'flex' }}>
+    <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', overflow: 'hidden' }}>
 
-      {/* Faixa lateral */}
-      <div style={{
-        width: STRIP, flexShrink: 0, height: '100%',
-        background: bgMode ? 'rgba(255,255,255,0.06)' : '#fff',
-        borderRight: bgMode ? 'none' : '1px solid #E6E6E6',
-        display: 'flex', flexDirection: 'column',
-        gap: 24, padding: 28, justifyContent: 'center'
-      }}>
-        {[0, 1, 2].map(i => {
-          const c = circles[i] || {};
-          return (
-            <div key={i} style={{
-              flex: 1, borderRadius: 16,
-              border: `5px solid ${i === 0 ? '#E89522' : i === 1 ? '#1F7A3A' : '#E89522'}`,
-              overflow: 'hidden', background: '#f5f5f5',
-              minHeight: 0
-            }}>
-              {c.img
-                ? <img src={c.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                : <BgPlaceholder />}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Produto — área principal */}
-      <div style={{ flex: 1, display: 'grid', placeItems: 'center', padding: 60, minWidth: 0 }}>
+      {/* Produto — área toda */}
+      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60 }}>
         {data.mainImg
           ? <img src={data.mainImg} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           : <BgPlaceholder style={{ width: '80%', height: '70%' }} />}
       </div>
+
+      {/* Círculos de detalhe sobrepostos */}
+      {spots.map((spot, i) => {
+        const sz = spot.size || 300;
+        return (
+          <div key={i}
+            onMouseDown={(ev) => startDrag(i, ev)}
+            style={{
+              position: 'absolute',
+              left: `${spot.x}%`,
+              top: `${spot.y}%`,
+              width: sz, height: sz,
+              borderRadius: '50%',
+              border: `${BORDER}px solid ${borderColor}`,
+              background: '#fff',
+              overflow: 'hidden',
+              cursor: 'grab',
+              boxShadow: '0 8px 28px rgba(0,0,0,.18)',
+              zIndex: 10,
+              flexShrink: 0,
+            }}
+          >
+            {/* Imagem do círculo */}
+            {spot.img
+              ? <img src={spot.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+              : <BgPlaceholder style={{ borderRadius: '50%' }} />}
+
+            {/* Controles inline — aparecem sempre (visíveis para edição) */}
+            <div
+              onMouseDown={ev => ev.stopPropagation()}
+              style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                background: 'rgba(0,0,0,0.55)',
+                display: 'flex', justifyContent: 'center', gap: 8,
+                padding: '10px 0',
+              }}
+            >
+              {/* Diminuir */}
+              <button
+                onClick={(ev) => { ev.stopPropagation(); setSpot(i, { size: Math.max(160, sz - 30) }); }}
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              >−</button>
+
+              {/* Trocar imagem */}
+              <button
+                onClick={(ev) => { ev.stopPropagation(); pickFile(i); }}
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              >📷</button>
+
+              {/* Aumentar */}
+              <button
+                onClick={(ev) => { ev.stopPropagation(); setSpot(i, { size: Math.min(560, sz + 30) }); }}
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.2)', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              >+</button>
+            </div>
+
+            {/* Input file oculto */}
+            <input ref={fileRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => onFile(i, e)} />
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -13,6 +13,11 @@ const INITIAL = {
   p1_circles: [{ img: '' }, { img: '' }, { img: '' }],
   p1_corner4: '',
   p1_variant: 'A',
+  p1e_spots: [
+    { img: '', x: 6,  y: 60, size: 300 },
+    { img: '', x: 60, y: 60, size: 300 },
+    { img: '', x: 60, y: 6,  size: 300 },
+  ],
 
   p2_f1_title: 'Sistema manual:',
   p2_f1_text: 'Com manivela para ajuste fino da inclinação.',
@@ -527,6 +532,19 @@ function TweaksUI({ data, set, productName, setProductName, storeName, setStoreN
           <ImgField label="Foto 1 — Detalhe centro / canto sup. dir." value={data.p1_circles[1].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[1]={img:v}; set('p1_circles', cs); }}/>
           <ImgField label="Foto 1 — Detalhe direito / canto inf. esq." value={data.p1_circles[2].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[2]={img:v}; set('p1_circles', cs); }}/>
           <ImgField label="Foto 1 — 4º canto inf. dir. (variante C)" value={data.p1_corner4||''} onChange={(v) => set('p1_corner4', v)}/>
+          {(data.p1_variant||'A') === 'E' && (<>
+            <SectionLabel>Variante E — círculos de detalhe</SectionLabel>
+            <Hint>Arraste os círculos diretamente na foto para reposicionar. Use +/− para redimensionar, ou troque a imagem abaixo.</Hint>
+            {(data.p1e_spots||[]).map((spot, i) => (
+              <ImgField key={i} label={`Círculo ${i+1} (tamanho atual: ${spot.size||300}px)`}
+                value={spot.img||''}
+                onChange={(v) => {
+                  const next = (data.p1e_spots||[]).map((s,j) => j===i ? {...s, img:v} : s);
+                  set('p1e_spots', next);
+                }}
+              />
+            ))}
+          </>)}
           <ImgField label="Foto 5 — Lifestyle / Estoque" value={data.p5_lifestyle} onChange={(v) => set('p5_lifestyle', v)}/>
           <ImgField label="Foto 6 — Lifestyle / Estoque" value={data.p6_lifestyle} onChange={(v) => set('p6_lifestyle', v)}/>
           <SectionLabel>Tamanho da miniatura do produto</SectionLabel>
