@@ -107,7 +107,7 @@ function Photo1E({ data, set, bgMode }) {
         <ZoomedImg src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
       </div>
 
-      {/* Círculo único movível */
+      {/* Círculo único movível */}
       <div
         onMouseDown={startDrag}
         style={{
