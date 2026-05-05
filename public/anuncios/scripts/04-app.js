@@ -1087,131 +1087,228 @@ function clearAllSavedBgs() {
 }
 
 // ---------------------------------------------------------------------------
-// SISTEMA DE ANÚNCIOS — salva/carrega por nome no localStorage
+// SUPABASE CONFIG
 // ---------------------------------------------------------------------------
-const LS_ADS_KEY = 'gerarml_ads';
-const LS_CURRENT_KEY = 'gerarml_current_ad';
+const SUPA_URL  = 'https://fmrdphxdfenisolrhrcl.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtcmRwaHhkZmVuaXNvbHJocmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQ0MzMsImV4cCI6MjA5MzQ1MDQzM30.aG-uOA72k8L1wtHZIFHQLH22e4chRGPvyR9K4-EJK0k';
+const SUPA_HDRS = { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` };
 
-function listAds() {
-  try { return JSON.parse(localStorage.getItem(LS_ADS_KEY) || '[]'); } catch(_){ return []; }
+async function supaFetch(method, path, body) {
+  const r = await fetch(`${SUPA_URL}/rest/v1${path}`, {
+    method,
+    headers: { ...SUPA_HDRS, Prefer: method === 'POST' ? 'return=representation' : '' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || r.status); }
+  return r.status === 204 ? null : r.json();
 }
 
-function saveAd(name, data, productName, storeName) {
-  const ads = listAds().filter(a => a.name !== name);
-  // Salva só os campos de texto e configuração — não as imagens (muito pesado)
-  // Imagens de fundo já estão em gerarml_bg_*, então não duplicamos
-  const dataToSave = { ...data };
-  // Remove imagens grandes do estado salvo para economizar espaço
-  // O usuário pode recarregar as fotos
-  const lightData = {};
-  Object.entries(dataToSave).forEach(([k, v]) => {
-    if (typeof v === 'string' && v.startsWith('data:image') && v.length > 50000) {
-      lightData[k] = ''; // Limpa imagens grandes, mantém campos de texto
+// Serializa data — remove imagens grandes (>50KB base64) para não estourar
+function serializeData(data) {
+  const out = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === 'string' && v.startsWith('data:image') && v.length > 70000) {
+      out[k] = '__img_omitted__';
     } else if (Array.isArray(v)) {
-      lightData[k] = v.map(item => typeof item === 'object' && item?.img?.startsWith('data:image') ? { ...item, img: '' } : item);
+      out[k] = v.map(item =>
+        item && typeof item === 'object' && item.img && item.img.length > 70000
+          ? { ...item, img: '__img_omitted__' }
+          : item
+      );
     } else {
-      lightData[k] = v;
+      out[k] = v;
     }
-  });
-  ads.unshift({ name, data: lightData, productName, storeName, savedAt: Date.now() });
+  }
+  return out;
+}
+
+function deserializeData(data) {
+  const out = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === '__img_omitted__') { out[k] = ''; }
+    else if (Array.isArray(v)) {
+      out[k] = v.map(item =>
+        item && typeof item === 'object' && item.img === '__img_omitted__'
+          ? { ...item, img: '' }
+          : item
+      );
+    } else { out[k] = v; }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// SISTEMA DE ANÚNCIOS — Supabase com fallback localStorage
+// ---------------------------------------------------------------------------
+const LS_ADS_KEY     = 'gerarml_ads';
+const LS_CURRENT_KEY = 'gerarml_current_ad';
+
+async function fetchAds() {
   try {
-    localStorage.setItem(LS_ADS_KEY, JSON.stringify(ads.slice(0, 30)));
-    localStorage.setItem(LS_CURRENT_KEY, name);
-  } catch(e) {
-    alert('Erro ao salvar — localStorage cheio. Tente limpar anúncios antigos.');
+    const rows = await supaFetch('GET', '/anuncios?order=updated_at.desc&limit=100&select=id,name,product_name,updated_at');
+    return rows || [];
+  } catch (_) {
+    // fallback localStorage
+    try { return JSON.parse(localStorage.getItem(LS_ADS_KEY) || '[]'); } catch(_){ return []; }
   }
 }
 
-function loadAd(name) {
-  return listAds().find(a => a.name === name) || null;
+async function fetchAdData(id) {
+  try {
+    const rows = await supaFetch('GET', `/anuncios?id=eq.${id}&select=*`);
+    return rows?.[0] || null;
+  } catch (_) { return null; }
 }
 
-function deleteAd(name) {
-  const ads = listAds().filter(a => a.name !== name);
-  localStorage.setItem(LS_ADS_KEY, JSON.stringify(ads));
+async function upsertAd(name, data, productName, storeName, existingId) {
+  const payload = {
+    name,
+    product_name: productName || '',
+    store_name:   storeName || '',
+    data:         serializeData(data),
+    updated_at:   new Date().toISOString(),
+  };
+  try {
+    if (existingId) {
+      await supaFetch('PATCH', `/anuncios?id=eq.${existingId}`, payload);
+      return existingId;
+    } else {
+      const rows = await supaFetch('POST', '/anuncios', payload);
+      return rows?.[0]?.id || null;
+    }
+  } catch (e) {
+    // Fallback localStorage
+    const ads = JSON.parse(localStorage.getItem(LS_ADS_KEY) || '[]').filter(a => a.name !== name);
+    ads.unshift({ name, product_name: productName, data: serializeData(data), updated_at: new Date().toISOString(), id: Date.now() });
+    localStorage.setItem(LS_ADS_KEY, JSON.stringify(ads.slice(0, 30)));
+    return ads[0].id;
+  }
 }
 
-function AdManager({ data, productName, storeName, onLoad, set, setProductName, setStoreName }) {
-  const [open, setOpen] = React.useState(false);
-  const [ads, setAds] = React.useState(listAds);
+async function deleteAdById(id) {
+  try { await supaFetch('DELETE', `/anuncios?id=eq.${id}`); } catch (_) {}
+}
+
+function AdManager({ data, productName, storeName, onLoad, setProductName, setStoreName }) {
+  const [ads, setAds]         = React.useState([]);
+  const [open, setOpen]       = React.useState(false);
   const [saveName, setSaveName] = React.useState(() => localStorage.getItem(LS_CURRENT_KEY) || '');
-  const [saved, setSaved] = React.useState(false);
+  const [currentId, setCurrentId] = React.useState(null);
+  const [status, setStatus]   = React.useState('idle'); // idle | saving | saved | loading | error
+  const [online, setOnline]   = React.useState(true);
 
-  const handleSave = () => {
+  // Carrega lista ao abrir
+  const loadList = async () => {
+    const rows = await fetchAds();
+    setAds(rows);
+    // Detecta se está online (tem id numérico real)
+    setOnline(rows.length === 0 || typeof rows[0].id === 'string');
+  };
+
+  React.useEffect(() => { loadList(); }, []);
+
+  const handleSave = async () => {
     if (!saveName.trim()) { alert('Digite um nome para o anúncio'); return; }
-    saveAd(saveName.trim(), data, productName, storeName);
-    setAds(listAds());
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setStatus('saving');
+    try {
+      const id = await upsertAd(saveName.trim(), data, productName, storeName, currentId);
+      setCurrentId(id);
+      localStorage.setItem(LS_CURRENT_KEY, saveName.trim());
+      setStatus('saved');
+      await loadList();
+      setTimeout(() => setStatus('idle'), 2500);
+    } catch (e) {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
   };
 
-  const handleLoad = (ad) => {
-    setProductName(ad.productName || '');
-    setStoreName(ad.storeName || '');
-    onLoad(ad.data);
-    setSaveName(ad.name);
-    localStorage.setItem(LS_CURRENT_KEY, ad.name);
+  const handleLoad = async (ad) => {
+    setStatus('loading');
     setOpen(false);
+    try {
+      const full = await fetchAdData(ad.id);
+      if (full?.data) {
+        const restored = deserializeData(full.data);
+        onLoad(restored);
+        setProductName(full.product_name || '');
+        setStoreName(full.store_name || '');
+        setSaveName(full.name);
+        setCurrentId(full.id);
+        localStorage.setItem(LS_CURRENT_KEY, full.name);
+      }
+    } catch (_) {}
+    setStatus('idle');
   };
 
-  const handleDelete = (name, e) => {
+  const handleDelete = async (ad, e) => {
     e.stopPropagation();
-    if (!confirm(`Apagar anúncio "${name}"?`)) return;
-    deleteAd(name);
-    setAds(listAds());
+    if (!confirm(`Apagar "${ad.name}"?`)) return;
+    await deleteAdById(ad.id);
+    setAds(prev => prev.filter(a => a.id !== ad.id));
+    if (currentId === ad.id) { setCurrentId(null); setSaveName(''); }
   };
+
+  const btnLabel = { idle: '💾 Salvar', saving: 'Salvando...', saved: '✓ Salvo!', loading: 'Carregando...', error: '✗ Erro' };
+  const btnColor = { idle: '#1F7A3A', saving: '#4b9e6a', saved: '#166534', loading: '#4b9e6a', error: '#dc2626' };
 
   return (
     <div style={{ maxWidth: 920, margin: '0 auto 12px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      {/* Campo nome + salvar */}
+      {/* Nome + salvar */}
       <div style={{ display: 'flex', gap: 6, flex: 1, minWidth: 220 }}>
-        <input
-          value={saveName}
-          onChange={e => setSaveName(e.target.value)}
+        <input value={saveName} onChange={e => setSaveName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSave()}
           placeholder="Nome do anúncio..."
-          style={{ flex: 1, padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit' }}
+          style={{ flex: 1, padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
         />
-        <button onClick={handleSave}
-          style={{ padding: '7px 16px', background: saved ? '#dcfce7' : '#1F7A3A', color: 'white', border: 0, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {saved ? '✓ Salvo' : '💾 Salvar'}
+        <button onClick={handleSave} disabled={status === 'saving' || status === 'loading'}
+          style={{ padding: '7px 16px', background: btnColor[status], color: 'white', border: 0, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .2s' }}>
+          {btnLabel[status]}
         </button>
       </div>
 
-      {/* Abrir lista de anúncios */}
+      {/* Lista de anúncios */}
       <div style={{ position: 'relative' }}>
-        <button onClick={() => { setAds(listAds()); setOpen(v => !v); }}
+        <button onClick={() => { loadList(); setOpen(v => !v); }}
           style={{ padding: '7px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          📂 Meus anúncios {ads.length > 0 && <span style={{ background: '#1F7A3A', color: 'white', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{ads.length}</span>}
+          📂 Anúncios
+          {ads.length > 0 && <span style={{ background: '#1F7A3A', color: 'white', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{ads.length}</span>}
         </button>
 
         {open && (
-          <div style={{ position: 'absolute', top: '110%', right: 0, background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200, minWidth: 280, maxHeight: 360, overflowY: 'auto' }}>
-            {ads.length === 0 ? (
-              <div style={{ padding: 20, color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Nenhum anúncio salvo ainda</div>
-            ) : ads.map(ad => (
-              <div key={ad.name} onClick={() => handleLoad(ad)}
-                style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{ad.name}</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                    {ad.productName && <span>{ad.productName} · </span>}
-                    {new Date(ad.savedAt).toLocaleDateString('pt-BR')}
+          <div style={{ position: 'absolute', top: '110%', right: 0, background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.14)', zIndex: 200, minWidth: 300, maxHeight: 400, overflowY: 'auto' }}>
+            <div style={{ padding: '10px 14px 6px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Anúncios salvos</span>
+              <span style={{ fontSize: 10, color: online ? '#10b981' : '#f59e0b', marginLeft: 'auto' }}>{online ? '☁ servidor' : '💾 local'}</span>
+            </div>
+            {ads.length === 0
+              ? <div style={{ padding: 20, color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Nenhum anúncio ainda</div>
+              : ads.map(ad => (
+                <div key={ad.id} onClick={() => handleLoad(ad)}
+                  style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: currentId === ad.id ? '#f0fdf4' : 'white', transition: 'background .1s' }}
+                  onMouseEnter={e => { if(currentId !== ad.id) e.currentTarget.style.background='#f9fafb'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = currentId===ad.id?'#f0fdf4':'white'; }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {ad.name}
+                      {currentId === ad.id && <span style={{ fontSize: 10, background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: 4 }}>atual</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                      {ad.product_name && <span>{ad.product_name} · </span>}
+                      {new Date(ad.updated_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                    </div>
                   </div>
+                  <button onClick={e => handleDelete(ad, e)}
+                    style={{ padding: '3px 8px', border: '1px solid #fca5a5', borderRadius: 5, background: 'white', color: '#ef4444', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                    Apagar
+                  </button>
                 </div>
-                <button onClick={e => handleDelete(ad.name, e)}
-                  style={{ padding: '3px 8px', border: '1px solid #fca5a5', borderRadius: 5, background: 'white', color: '#ef4444', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
-                  Apagar
-                </button>
-              </div>
-            ))}
+              ))
+            }
           </div>
         )}
       </div>
 
-      {/* Fechar dropdown ao clicar fora */}
       {open && <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setOpen(false)}/>}
     </div>
   );
