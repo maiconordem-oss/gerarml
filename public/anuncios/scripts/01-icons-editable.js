@@ -58,17 +58,60 @@ function E({ value, onChange, className, style, multi }) {
 }
 
 /* =============== EXPORT TO PNG =============== */
+const FONT_FILES = [
+  { family: 'Inter', file: '/anuncios/fonts/inter-latin.woff2' },
+  { family: 'Inter', file: '/anuncios/fonts/inter-latin-ext.woff2' },
+  { family: 'Montserrat', file: '/anuncios/fonts/montserrat-latin.woff2' },
+  { family: 'Montserrat', file: '/anuncios/fonts/montserrat-latin-ext.woff2' },
+];
+
+let fontEmbedCache = null;
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+async function buildLocalFontEmbedCSS() {
+  if (fontEmbedCache) return fontEmbedCache;
+  const blocks = await Promise.all(FONT_FILES.map(async ({ family, file }) => {
+    const response = await fetch(file, { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`Fonte não encontrada: ${file}`);
+    const base64 = arrayBufferToBase64(await response.arrayBuffer());
+    return `@font-face{font-family:'${family}';font-style:normal;font-weight:100 900;font-display:block;src:url(data:font/woff2;base64,${base64}) format('woff2');}`;
+  }));
+  fontEmbedCache = blocks.join('\n') + `\n*{font-synthesis:none!important;text-rendering:geometricPrecision!important;}`;
+  return fontEmbedCache;
+}
+
+async function waitForTemplateFonts() {
+  if (document.fonts?.load) {
+    await Promise.all([
+      document.fonts.load('400 24px Inter'),
+      document.fonts.load('600 24px Inter'),
+      document.fonts.load('700 48px Montserrat'),
+      document.fonts.load('800 56px Montserrat'),
+    ]);
+  }
+  await document.fonts?.ready;
+}
+
 async function exportCanvas(node, filename) {
   if (!window.htmlToImage) {
     alert('Carregando biblioteca de export... aguarde 1s e tente de novo.');
     return;
   }
+  let prevTransform = '';
   try {
     // Aguarda todas as fontes carregarem
-    await document.fonts.ready;
+    await waitForTemplateFonts();
 
     // Reseta scale e ativa modo export (remove outlines de edição)
-    const prevTransform = node.style.transform;
+    prevTransform = node.style.transform;
     node.style.transform = 'scale(1)';
     node.style.transformOrigin = 'top left';
     node.classList.add('exporting');
@@ -76,11 +119,8 @@ async function exportCanvas(node, filename) {
     // Pausa para o browser repintar com os estilos de export
     await new Promise(r => setTimeout(r, 80));
 
-    // Coleta as fontes já carregadas na página para embutir no PNG
-    let fontEmbedCSS = '';
-    try {
-      fontEmbedCSS = await window.htmlToImage.getFontEmbedCSS(node);
-    } catch (_) {}
+    // Embute Inter e Montserrat locais no PNG para o download sair igual ao preview
+    const fontEmbedCSS = await buildLocalFontEmbedCSS();
 
     const dataUrl = await window.htmlToImage.toPng(node, {
       width: 1200,
@@ -101,6 +141,8 @@ async function exportCanvas(node, filename) {
   } catch (e) {
     console.error(e);
     alert('Erro ao exportar: ' + e.message);
+    node.style.transform = prevTransform;
+    node.classList.remove('exporting');
   }
 }
 
