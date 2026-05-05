@@ -8,6 +8,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 
 const INITIAL = {
   mainImg: 'assets/produto-capa.jpg',
+  p1_img: '', p2_img: '', p3_img: '', p4_img: '',
   productOnlyImg: '',
 
   p1_zoom: 1, p2_zoom: 1, p3_zoom: 1, p4_zoom: 1, p5_zoom: 1, p6_zoom: 1,
@@ -113,17 +114,29 @@ const INITIAL = {
 async function autoGenerate(uploadedDataUrls) {
   const out = {};
   if (!uploadedDataUrls.length) return out;
-  out.mainImg = uploadedDataUrls[0];
-  if (uploadedDataUrls.length >= 3) {
-    out.p5_lifestyle = uploadedDataUrls[2];
-    out.p6_lifestyle = uploadedDataUrls[2];
-  } else if (uploadedDataUrls.length >= 2) {
-    out.p5_lifestyle = uploadedDataUrls[1];
-    out.p6_lifestyle = uploadedDataUrls[1];
-  }
-  const crops = await makeCircleCrops(uploadedDataUrls[0]);
+
+  const src = uploadedDataUrls[0];
+  const src2 = uploadedDataUrls[1] || src;
+  const src3 = uploadedDataUrls[2] || src2;
+
+  // mainImg = base de fallback (fotos que não têm imagem própria)
+  out.mainImg = src;
+
+  // Cada slot tem sua própria imagem
+  out.p1_img = src;   // capa — foto principal do produto
+  out.p2_img = src;   // características
+  out.p3_img = src;   // dimensões
+  out.p4_img = src2;  // lifestyle — usa 2ª foto se houver
+
+  // Fotos 5/6 — lifestyle
+  out.p5_lifestyle = src2;
+  out.p6_lifestyle = src2;
+
+  // Crops para os círculos da capa
+  const crops = await makeCircleCrops(src);
   out.p1_circles = crops.map(img => ({ img }));
-  if (uploadedDataUrls.length >= 2) out.p1_corner4 = uploadedDataUrls[1];
+  out.p1_corner4 = src3;
+
   return out;
 }
 
@@ -217,13 +230,11 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   const src = sourceImgs[0];
   if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
 
-  // Slot 1 — hero shot estúdio → mainImg (aparece em todas as fotos)
   if (slotNum === 1) {
     const img = await callGptImage1(src, getPrompt(1));
-    return { mainImg: img };
+    return { p1_img: img }; // só foto 1
   }
 
-  // Slot 2 — 2 closes → círculos da capa (p1_circles)
   if (slotNum === 2) {
     const [c1, c2] = await Promise.all([
       callGptImage1(src, getPrompt('2a')),
@@ -235,23 +246,21 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
     };
   }
 
-  // Slot 3 — hero + 2 closes → mainImg + circles
   if (slotNum === 3) {
     const [hero, cl1, cl2] = await Promise.all([
       callGptImage1(src, getPrompt(3)),
       callGptImage1(src, getPrompt('2a')),
       callGptImage1(src, getPrompt('2b')),
     ]);
-    return { mainImg: hero, p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }] };
+    return {
+      p3_img: hero, // só foto 3
+      p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }],
+    };
   }
 
-  // Slot 4 — lifestyle → mainImg do slot 4 é o mainImg global
-  // Fotos 5 e 6 usam p5_lifestyle/p6_lifestyle
   if (slotNum === 4) {
     const img = await callGptImage1(src, getPrompt(4));
-    // Slot 4 usa mainImg para o produto em uso
-    // Fotos 5/6 usam p5/p6_lifestyle — atualiza os dois
-    return { mainImg: img, p5_lifestyle: img, p6_lifestyle: img };
+    return { p4_img: img }; // só foto 4
   }
 
   return {};
@@ -837,7 +846,11 @@ function TweaksUI({ data, set, productName, setProductName, storeName, setStoreN
           <Hint>Você também pode clicar direto no texto da foto para editar in-loco.</Hint>
         </>)}
         {tab === 'imgs' && (<>
-          <ImgField label="Imagem principal do produto" value={data.mainImg} onChange={(v) => set('mainImg', v)}/>
+          <ImgField label="Imagem principal (fallback)" value={data.mainImg} onChange={(v) => set('mainImg', v)}/>
+          <ImgField label="Foto 1 — Imagem da capa" value={data.p1_img||''} onChange={(v) => set('p1_img', v)}/>
+          <ImgField label="Foto 2 — Imagem características" value={data.p2_img||''} onChange={(v) => set('p2_img', v)}/>
+          <ImgField label="Foto 3 — Imagem dimensões" value={data.p3_img||''} onChange={(v) => set('p3_img', v)}/>
+          <ImgField label="Foto 4 — Imagem lifestyle/uso" value={data.p4_img||''} onChange={(v) => set('p4_img', v)}/>
           <ImgField label="Foto 1 — Detalhe esquerdo" value={data.p1_circles[0].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[0]={img:v}; set('p1_circles', cs); }}/>
           <ImgField label="Foto 1 — Detalhe centro / canto sup. dir." value={data.p1_circles[1].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[1]={img:v}; set('p1_circles', cs); }}/>
           <ImgField label="Foto 1 — Detalhe direito / canto inf. esq." value={data.p1_circles[2].img} onChange={(v) => { const cs=[...data.p1_circles]; cs[2]={img:v}; set('p1_circles', cs); }}/>
@@ -1367,9 +1380,9 @@ function App() {
             <VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>
             <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
               <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
-              <ClipboardBar hasImg={!!data.mainImg}
-                onCopy={() => { window._imgClipboard = data.mainImg; }}
-                onPaste={(img) => set('mainImg', img)}/>
+              <ClipboardBar hasImg={!!(data.p1_img||data.mainImg)}
+                onCopy={() => { window._imgClipboard = data.p1_img||data.mainImg; }}
+                onPaste={(img) => set('p1_img', img)}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
                 label="Gerar hero (estúdio)" title="Gera foto do produto em fundo branco de estúdio"
                 promptKeys={[1]}/>
@@ -1381,9 +1394,9 @@ function App() {
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
+            <ClipboardBar hasImg={!!(data.p2_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p2_img||data.mainImg; }}
+              onPaste={(img) => set('p2_img', img)}/>
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
               label="Gerar 2 closes" title="Gera 2 closes do produto para os círculos de detalhe"
               promptKeys={['2a','2b']}/>
@@ -1394,9 +1407,9 @@ function App() {
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
+            <ClipboardBar hasImg={!!(data.p3_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p3_img||data.mainImg; }}
+              onPaste={(img) => set('p3_img', img)}/>
             <AIGenBtn slotNum={3} rawImgs={rawFiles} onResult={merge}
               label="Gerar hero + 2 closes" title="Gera foto hero + 2 closes para essa foto"
               promptKeys={[3,'2a','2b']}/>
@@ -1407,9 +1420,9 @@ function App() {
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
+            <ClipboardBar hasImg={!!(data.p4_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p4_img||data.mainImg; }}
+              onPaste={(img) => set('p4_img', img)}/>
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
               label="Gerar lifestyle" title="Gera foto do produto em uso para lifestyle"
               promptKeys={[4]}/>
@@ -1420,9 +1433,9 @@ function App() {
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
+            <ClipboardBar hasImg={!!(data.p1_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p1_img||data.mainImg; }}
+              onPaste={(img) => set('p1_img', img)}/>
           </div>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
@@ -1430,9 +1443,9 @@ function App() {
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
+            <ClipboardBar hasImg={!!(data.p1_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p1_img||data.mainImg; }}
+              onPaste={(img) => set('p1_img', img)}/>
           </div>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
