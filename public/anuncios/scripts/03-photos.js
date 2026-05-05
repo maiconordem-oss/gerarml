@@ -270,10 +270,6 @@ function Photo3({ data, set, bgMode }) {
 
         <Drag id="p3_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', right: 0, top: 0, width: '58%', height: '100%' }}>
           <ZoomedImg src={data.mainImg} zoom={data.p3_zoom||1} wrapStyle={{ width: '100%', height: '100%' }} />
-          <DimLabel value={data.p3_dim1} onChange={(v) => set('p3_dim1', v)} style={{ top: '14%', right: 0 }} />
-          <DimLabel value={data.p3_dim2} onChange={(v) => set('p3_dim2', v)} style={{ top: '40%', left: 0 }} />
-          <DimLabel value={data.p3_dim3} onChange={(v) => set('p3_dim3', v)} style={{ top: '66%', right: 0 }} />
-          <DimLabel value={data.p3_dim4} onChange={(v) => set('p3_dim4', v)} style={{ bottom: '6%', left: '50%', transform: 'translateX(-50%)' }} />
         </Drag>
 
         {!bgMode && <><Arrow d="M 30,16 C 40,18 44,20 50,24" />
