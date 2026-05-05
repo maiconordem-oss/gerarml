@@ -217,11 +217,13 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   const src = sourceImgs[0];
   if (!src) throw new Error('Suba pelo menos 1 foto do produto primeiro.');
 
+  // Slot 1 — hero shot estúdio → mainImg (aparece em todas as fotos)
   if (slotNum === 1) {
     const img = await callGptImage1(src, getPrompt(1));
     return { mainImg: img };
   }
 
+  // Slot 2 — 2 closes → círculos da capa (p1_circles)
   if (slotNum === 2) {
     const [c1, c2] = await Promise.all([
       callGptImage1(src, getPrompt('2a')),
@@ -233,6 +235,7 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
     };
   }
 
+  // Slot 3 — hero + 2 closes → mainImg + circles
   if (slotNum === 3) {
     const [hero, cl1, cl2] = await Promise.all([
       callGptImage1(src, getPrompt(3)),
@@ -242,9 +245,13 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
     return { mainImg: hero, p1_circles: [{ img: cl1 }, { img: cl2 }, { img: '' }] };
   }
 
+  // Slot 4 — lifestyle → mainImg do slot 4 é o mainImg global
+  // Fotos 5 e 6 usam p5_lifestyle/p6_lifestyle
   if (slotNum === 4) {
     const img = await callGptImage1(src, getPrompt(4));
-    return { p5_lifestyle: img, p6_lifestyle: img };
+    // Slot 4 usa mainImg para o produto em uso
+    // Fotos 5/6 usam p5/p6_lifestyle — atualiza os dois
+    return { mainImg: img, p5_lifestyle: img, p6_lifestyle: img };
   }
 
   return {};
@@ -1079,6 +1086,137 @@ function clearAllSavedBgs() {
   for (const k of BG_KEYS) localStorage.removeItem(LS_BG_PREFIX + k);
 }
 
+// ---------------------------------------------------------------------------
+// SISTEMA DE ANÚNCIOS — salva/carrega por nome no localStorage
+// ---------------------------------------------------------------------------
+const LS_ADS_KEY = 'gerarml_ads';
+const LS_CURRENT_KEY = 'gerarml_current_ad';
+
+function listAds() {
+  try { return JSON.parse(localStorage.getItem(LS_ADS_KEY) || '[]'); } catch(_){ return []; }
+}
+
+function saveAd(name, data, productName, storeName) {
+  const ads = listAds().filter(a => a.name !== name);
+  // Salva só os campos de texto e configuração — não as imagens (muito pesado)
+  // Imagens de fundo já estão em gerarml_bg_*, então não duplicamos
+  const dataToSave = { ...data };
+  // Remove imagens grandes do estado salvo para economizar espaço
+  // O usuário pode recarregar as fotos
+  const lightData = {};
+  Object.entries(dataToSave).forEach(([k, v]) => {
+    if (typeof v === 'string' && v.startsWith('data:image') && v.length > 50000) {
+      lightData[k] = ''; // Limpa imagens grandes, mantém campos de texto
+    } else if (Array.isArray(v)) {
+      lightData[k] = v.map(item => typeof item === 'object' && item?.img?.startsWith('data:image') ? { ...item, img: '' } : item);
+    } else {
+      lightData[k] = v;
+    }
+  });
+  ads.unshift({ name, data: lightData, productName, storeName, savedAt: Date.now() });
+  try {
+    localStorage.setItem(LS_ADS_KEY, JSON.stringify(ads.slice(0, 30)));
+    localStorage.setItem(LS_CURRENT_KEY, name);
+  } catch(e) {
+    alert('Erro ao salvar — localStorage cheio. Tente limpar anúncios antigos.');
+  }
+}
+
+function loadAd(name) {
+  return listAds().find(a => a.name === name) || null;
+}
+
+function deleteAd(name) {
+  const ads = listAds().filter(a => a.name !== name);
+  localStorage.setItem(LS_ADS_KEY, JSON.stringify(ads));
+}
+
+function AdManager({ data, productName, storeName, onLoad, set, setProductName, setStoreName }) {
+  const [open, setOpen] = React.useState(false);
+  const [ads, setAds] = React.useState(listAds);
+  const [saveName, setSaveName] = React.useState(() => localStorage.getItem(LS_CURRENT_KEY) || '');
+  const [saved, setSaved] = React.useState(false);
+
+  const handleSave = () => {
+    if (!saveName.trim()) { alert('Digite um nome para o anúncio'); return; }
+    saveAd(saveName.trim(), data, productName, storeName);
+    setAds(listAds());
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleLoad = (ad) => {
+    setProductName(ad.productName || '');
+    setStoreName(ad.storeName || '');
+    onLoad(ad.data);
+    setSaveName(ad.name);
+    localStorage.setItem(LS_CURRENT_KEY, ad.name);
+    setOpen(false);
+  };
+
+  const handleDelete = (name, e) => {
+    e.stopPropagation();
+    if (!confirm(`Apagar anúncio "${name}"?`)) return;
+    deleteAd(name);
+    setAds(listAds());
+  };
+
+  return (
+    <div style={{ maxWidth: 920, margin: '0 auto 12px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Campo nome + salvar */}
+      <div style={{ display: 'flex', gap: 6, flex: 1, minWidth: 220 }}>
+        <input
+          value={saveName}
+          onChange={e => setSaveName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          placeholder="Nome do anúncio..."
+          style={{ flex: 1, padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit' }}
+        />
+        <button onClick={handleSave}
+          style={{ padding: '7px 16px', background: saved ? '#dcfce7' : '#1F7A3A', color: 'white', border: 0, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {saved ? '✓ Salvo' : '💾 Salvar'}
+        </button>
+      </div>
+
+      {/* Abrir lista de anúncios */}
+      <div style={{ position: 'relative' }}>
+        <button onClick={() => { setAds(listAds()); setOpen(v => !v); }}
+          style={{ padding: '7px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          📂 Meus anúncios {ads.length > 0 && <span style={{ background: '#1F7A3A', color: 'white', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{ads.length}</span>}
+        </button>
+
+        {open && (
+          <div style={{ position: 'absolute', top: '110%', right: 0, background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200, minWidth: 280, maxHeight: 360, overflowY: 'auto' }}>
+            {ads.length === 0 ? (
+              <div style={{ padding: 20, color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Nenhum anúncio salvo ainda</div>
+            ) : ads.map(ad => (
+              <div key={ad.name} onClick={() => handleLoad(ad)}
+                style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{ad.name}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                    {ad.productName && <span>{ad.productName} · </span>}
+                    {new Date(ad.savedAt).toLocaleDateString('pt-BR')}
+                  </div>
+                </div>
+                <button onClick={e => handleDelete(ad.name, e)}
+                  style={{ padding: '3px 8px', border: '1px solid #fca5a5', borderRadius: 5, background: 'white', color: '#ef4444', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                  Apagar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Fechar dropdown ao clicar fora */}
+      {open && <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setOpen(false)}/>}
+    </div>
+  );
+}
+
 function App() {
   const [data, setData] = useState(() => ({ ...INITIAL, ...loadSavedBgs() }));
   const [productName, setProductName] = useState(TWEAK_DEFAULTS.productName);
@@ -1122,6 +1260,8 @@ function App() {
       </header>
 
       <OpenAIKeyBanner apiKey={apiKey} setApiKey={setApiKey}/>
+      <AdManager data={data} productName={productName} storeName={storeName}
+        onLoad={merge} set={set} setProductName={setProductName} setStoreName={setStoreName}/>
       <UploadZone onGenerate={merge} productName={productName} setProductName={setProductName} onRawFiles={setRawFiles}/>
 
       <div className="grid">
