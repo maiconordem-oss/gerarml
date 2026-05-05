@@ -78,7 +78,7 @@ function arrayBufferToBase64(buffer) {
 
 async function buildLocalFontEmbedCSS() {
   if (fontEmbedCache) return fontEmbedCache;
-  const blocks = await Promise.all(FONT_FILES.map(async ({ family, file }) => {
+  const blocks = await Promise.all(FONT_FILES.map(async ({ family, file, range }) => {
     const response = await fetch(file, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`Fonte não encontrada: ${file}`);
     const base64 = arrayBufferToBase64(await response.arrayBuffer());
