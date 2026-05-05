@@ -111,7 +111,6 @@ const INITIAL = {
    AUTO-GENERATE: dado N fotos, gera os crops para os 5 templates
    ============================================================= */
 async function autoGenerate(uploadedDataUrls) {
-async function autoGenerate(uploadedDataUrls) {
   const out = {};
   if (!uploadedDataUrls.length) return out;
   const src = uploadedDataUrls[0];
