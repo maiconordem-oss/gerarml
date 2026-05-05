@@ -66,6 +66,7 @@ const FONT_FILES = [
 ];
 
 let fontEmbedCache = null;
+const TRANSPARENT_IMAGE_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -128,6 +129,7 @@ async function exportCanvas(node, filename) {
       pixelRatio: 1,
       cacheBust: true,
       fontEmbedCSS,
+      imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
     });
 
     // Restaura estado visual
@@ -139,8 +141,9 @@ async function exportCanvas(node, filename) {
     a.download = filename;
     a.click();
   } catch (e) {
-    console.error(e);
-    alert('Erro ao exportar: ' + e.message);
+    console.error('Falha no export PNG:', e);
+    const details = e?.message || e?.type || (e instanceof Event ? 'alguma imagem do template não carregou' : String(e || 'erro desconhecido'));
+    alert('Erro ao exportar: ' + details);
     node.style.transform = prevTransform;
     node.classList.remove('exporting');
   }
