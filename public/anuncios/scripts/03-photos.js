@@ -298,12 +298,11 @@ function DimLabel({ value, onChange, style }) {
 
 /* ============== Photo 4: Solução ideal ============== */
 function Photo4({ data, set, bgMode }) {
-  const textMode = data && data.__textMode;
   return (
     <div className="tpl" style={{ padding: '80px 90px 60px', background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
 
       {/* Título */}
-      <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1, position: 'relative', zIndex: 10 }}>
+      <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1, position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <Ed value={data.p4_title_a} onChange={(v) => set('p4_title_a', v)} />
         {' '}
         <Ed value={data.p4_title_b} onChange={(v) => set('p4_title_b', v)} className="green" />
@@ -313,16 +312,17 @@ function Photo4({ data, set, bgMode }) {
         <span className="pill-yellow-inline"><Ed value={data.p4_title_pill} onChange={(v) => set('p4_title_pill', v)} /></span>
       </h1>
 
-      {/* Imagem do produto — livre */}
-      <PanZoom src={data.p4_img||data.mainImg} zoom={data.p4_zoom||1} panKey="p4_pan" data={data} set={set}/>
+      {/* Espaço da imagem — flex:1 empurra benefits para baixo */}
+      <div style={{ flex: 1, position: 'relative', minHeight: 600 }}>
+        <PanZoom src={data.p4_img||data.mainImg} zoom={data.p4_zoom||1} panKey="p4_pan" data={data} set={set}/>
+      </div>
 
-      {/* 2 características com ícone — acima do callout, zIndex alto */}
+      {/* 2 características com ícone */}
       <div style={{
-        position: 'relative', zIndex: 10,
+        position: 'relative', zIndex: 10, flexShrink: 0,
         display: 'grid', gridTemplateColumns: '1fr 1fr',
         gap: 32, marginBottom: 30,
       }}>
-        {/* Esquerda */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
           <IcPicker iconKey="p4_ic1" data={data} set={set} size={110} borderRadius={22}/>
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -332,8 +332,6 @@ function Photo4({ data, set, bgMode }) {
               style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', display: 'block', marginTop: 8 }} />
           </div>
         </div>
-
-        {/* Direita — alinhado à direita */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexDirection: 'row-reverse' }}>
           <IcPicker iconKey="p4_ic2" data={data} set={set} size={110} borderRadius={22}/>
           <div style={{ minWidth: 0, flex: 1, textAlign: 'right' }}>
@@ -345,8 +343,8 @@ function Photo4({ data, set, bgMode }) {
         </div>
       </div>
 
-      {/* Callout — fixo na parte inferior, centralizado */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
+      {/* Callout — fixo na base */}
+      <div style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         {bgMode ? (
           <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'center', maxWidth: 900, margin: '0 auto' }}>
             <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)}
