@@ -43,8 +43,8 @@ function CurvedArrow({ from, to, curve = 0.3, color = "#1F7A3A" }) {
 }
 
 /* =============== EDITABLE TEXT ===============
-   Ao focar, emite evento global 'ml-text-focus' com ref e callbacks.
-   O TextFormatPanel (fora do canvas escalado) escuta e mostra os controles.
+   Ao focar, publica no window.__mlFmtActive = { el, onSave, onCancel }
+   O painel lê isso. Usa onMouseDown:preventDefault para nunca perder foco.
 */
 function E({ value, onChange, className, style, multi }) {
   const Tag = multi ? 'div' : 'span';
@@ -52,35 +52,36 @@ function E({ value, onChange, className, style, multi }) {
   const prevValue = useRef(value);
   const [focused, setFocused] = useState(false);
 
-  const emit = (active) => {
-    window.dispatchEvent(new CustomEvent('ml-text-focus', {
-      detail: active ? {
-        el: ref.current,
-        style,
-        onSave: (html) => onChange(html),
-        onCancel: () => { if (ref.current) ref.current.innerHTML = prevValue.current; },
-      } : null
-    }));
+  const publish = (active) => {
+    window.__mlFmtActive = active ? {
+      el: ref.current,
+      onSave: (html) => onChange(html),
+      onCancel: () => { if (ref.current) ref.current.innerHTML = prevValue.current; },
+    } : null;
+    window.dispatchEvent(new CustomEvent('ml-text-focus', { detail: window.__mlFmtActive }));
   };
 
   const handleFocus = () => {
     prevValue.current = ref.current ? ref.current.innerHTML : value;
     setFocused(true);
-    emit(true);
+    publish(true);
   };
 
   const handleBlur = (e) => {
-    // Checar se foco foi pro painel lateral (tem data-fmt-panel)
-    const related = e.relatedTarget;
-    if (related && (related.closest && related.closest('[data-fmt-panel]'))) return;
-    setFocused(false);
-    if (ref.current) onChange(ref.current.innerHTML);
-    emit(false);
+    // NUNCA fechar se o foco foi para algo com data-fmt-panel
+    // onMouseDown:preventDefault no painel garante que relatedTarget = null aqui
+    // Usamos um delay pequeno para checar se o painel capturou o clique
+    setTimeout(() => {
+      if (window.__mlFmtClicking) return; // painel está sendo clicado
+      setFocused(false);
+      if (ref.current) onChange(ref.current.innerHTML);
+      publish(false);
+    }, 80);
   };
 
   const handleKeyDown = (e) => {
-    if ((e.ctrlKey||e.metaKey) && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
-    if ((e.ctrlKey||e.metaKey) && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
+    if ((e.ctrlKey||e.metaKey) && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); onChange(ref.current.innerHTML); }
+    if ((e.ctrlKey||e.metaKey) && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); onChange(ref.current.innerHTML); }
     if (e.key === 'Escape') {
       if (ref.current) ref.current.innerHTML = prevValue.current;
       ref.current && ref.current.blur();
@@ -106,273 +107,223 @@ function E({ value, onChange, className, style, multi }) {
       onFocus={handleFocus}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      onMouseUp={() => emit(true)}
       dangerouslySetInnerHTML={{ __html: (value||'').replace(/\n/g,'<br/>') }}
     />
   );
 }
 
-/* =============== TEXT FORMAT PANEL — painel lateral fixo ===============
-   Fica fora do canvas escalado, na lateral direita do slot.
-   Escuta 'ml-text-focus' e mostra controles quando texto está ativo.
+/* =============== TEXT FORMAT PANEL — portal fixo na página ===============
+   Montado UMA VEZ no body. Fica fixo no canto direito da tela.
+   Todos os botões usam onMouseDown:preventDefault para não tirar foco do texto.
+   Usa window.__mlFmtClicking como flag durante o clique.
 */
 function TextFormatPanel() {
-  const panelRef = useRef(null);
-  const [active, setActive] = useState(null); // { el, style, onSave, onCancel }
+  const [active, setActive] = useState(null);
   const [size, setSize] = useState(32);
   const [sizeInput, setSizeInput] = useState('32');
   const [color, setColor] = useState('#000000');
   const [charCount, setCharCount] = useState(0);
   const savedRange = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      if (!e.detail) {
-        setActive(null);
-        return;
-      }
+      if (!e.detail) { setActive(null); return; }
       setActive(e.detail);
-      // Detectar tamanho e cor do elemento
       const el = e.detail.el;
-      if (el) {
-        const computed = window.getComputedStyle(el);
-        const sz = Math.round(parseFloat(el.style.fontSize) || parseFloat(computed.fontSize) || 32);
-        setSize(sz);
-        setSizeInput(String(sz));
-        setCharCount(el.innerText.length);
-        // Cor — tenta pegar do style inline ou computed
-        const clr = el.style.color || computed.color || '#000000';
-        // Converter rgb() para hex se necessário
-        const m = clr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        if (m) {
-          const hex = '#' + [m[1],m[2],m[3]].map(n => (+n).toString(16).padStart(2,'0')).join('');
-          setColor(hex);
-        } else if (clr.startsWith('#')) {
-          setColor(clr);
-        }
-      }
+      if (!el) return;
+      const computed = window.getComputedStyle(el);
+      const sz = Math.round(parseFloat(el.style.fontSize) || parseFloat(computed.fontSize) || 32);
+      setSize(sz); setSizeInput(String(sz));
+      setCharCount(el.innerText.length);
+      const clr = el.style.color || computed.color || '';
+      const m = clr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (m) setColor('#'+[m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join(''));
+      else if (clr.startsWith('#')) setColor(clr);
     };
     window.addEventListener('ml-text-focus', handler);
     return () => window.removeEventListener('ml-text-focus', handler);
   }, []);
 
-  // Atualizar contagem ao digitar
   useEffect(() => {
     if (!active) return;
     const el = active.el;
-    if (!el) return;
     const onInput = () => setCharCount(el.innerText.length);
     el.addEventListener('input', onInput);
     return () => el.removeEventListener('input', onInput);
   }, [active]);
 
-  const saveSelection = () => {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
+  // Salvar seleção antes de cada ação
+  const saveSel = () => {
+    const s = window.getSelection();
+    if (s && s.rangeCount > 0) savedRange.current = s.getRangeAt(0).cloneRange();
   };
 
-  const restoreAndFocus = () => {
+  // Restaurar seleção no elemento ativo
+  const restoreSel = () => {
+    if (!active || !savedRange.current) return;
+    active.el.focus();
+    const s = window.getSelection();
+    try { s.removeAllRanges(); s.addRange(savedRange.current); } catch(_) {}
+  };
+
+  // Wrapper para todos os cliques no painel
+  const panelMouseDown = (e) => {
+    e.preventDefault(); // impede perda de foco do contentEditable
+    window.__mlFmtClicking = true;
+    saveSel();
+    setTimeout(() => { window.__mlFmtClicking = false; }, 200);
+  };
+
+  const fmt = (cmd) => {
+    restoreSel();
+    document.execCommand(cmd);
+    if (active) { saveSel(); active.onSave(active.el.innerHTML); }
+  };
+
+  const applySize = (sz) => {
     if (!active) return;
-    active.el.focus();
-    if (savedRange.current) {
-      const sel = window.getSelection();
-      try { sel.removeAllRanges(); sel.addRange(savedRange.current); } catch(_) {}
-    }
-  };
-
-  const fmt = (cmd, val) => {
-    restoreAndFocus();
-    document.execCommand(cmd, false, val || null);
-    active.el.focus();
-    saveSelection();
-  };
-
-  const applySize = (newSize) => {
-    if (!active || !active.el) return;
-    const sz = Math.max(8, Math.min(300, newSize));
-    setSize(sz);
-    setSizeInput(String(sz));
-    active.el.focus();
-    if (savedRange.current) {
-      const sel = window.getSelection();
-      try { sel.removeAllRanges(); sel.addRange(savedRange.current); } catch(_) {}
-    }
+    const s = Math.max(8, Math.min(300, sz));
+    setSize(s); setSizeInput(String(s));
+    restoreSel();
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.getRangeAt(0).collapsed) {
-      // Sem seleção — aplica no elemento inteiro
-      active.el.style.fontSize = sz + 'px';
-      active.onSave(active.el.innerHTML);
+      active.el.style.fontSize = s + 'px';
     } else {
       const range = sel.getRangeAt(0);
       const span = document.createElement('span');
-      span.style.fontSize = sz + 'px';
+      span.style.fontSize = s + 'px';
       try { range.surroundContents(span); }
       catch(_) { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
       sel.removeAllRanges();
-      active.onSave(active.el.innerHTML);
     }
+    active.onSave(active.el.innerHTML);
     active.el.focus();
   };
 
   const applyColor = (hex) => {
     setColor(hex);
-    restoreAndFocus();
+    restoreSel();
     document.execCommand('foreColor', false, hex);
-    active.el.focus();
-    saveSelection();
-    active.onSave(active.el.innerHTML);
+    if (active) { saveSel(); active.onSave(active.el.innerHTML); }
   };
 
-  const applyAlign = (align) => {
-    restoreAndFocus();
-    document.execCommand('justify' + align.charAt(0).toUpperCase() + align.slice(1));
-    active.el.focus();
-    saveSelection();
-    active.onSave(active.el.innerHTML);
+  const applyAlign = (a) => {
+    restoreSel();
+    document.execCommand('justify' + a[0].toUpperCase() + a.slice(1));
+    if (active) { saveSel(); active.onSave(active.el.innerHTML); }
   };
 
   if (!active) return null;
 
   const warnColor = charCount > 80 ? '#dc2626' : charCount > 50 ? '#f59e0b' : '#aaa';
 
-  const Btn = ({ onClick, children, title, active: isActive }) => (
+  const Btn = ({ cmd, children, title }) => (
     <button
-      data-fmt-panel="true"
       title={title}
-      onMouseDown={e => { e.preventDefault(); saveSelection(); }}
-      onClick={e => { e.preventDefault(); e.stopPropagation(); onClick(); }}
+      onMouseDown={panelMouseDown}
+      onClick={() => fmt(cmd)}
       style={{
-        width: '100%', padding: '7px 4px', border: 'none', borderRadius: 6,
-        background: isActive ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)',
-        color: '#fff', fontSize: 14, fontWeight: 700,
-        cursor: 'pointer', lineHeight: 1.2,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'background .1s',
+        width:'100%', padding:'8px 4px', border:'none', borderRadius:6,
+        background:'rgba(255,255,255,.08)', color:'#fff',
+        fontSize:15, fontWeight:700, cursor:'pointer', lineHeight:1.2,
+        display:'flex', alignItems:'center', justifyContent:'center',
       }}
     >{children}</button>
   );
 
-  const Sep = () => <div style={{width:'100%', height:1, background:'rgba(255,255,255,.12)', margin:'4px 0'}}/>;
-
-  const Label = ({ children }) => (
-    <div style={{fontSize:9, color:'rgba(255,255,255,.4)', textAlign:'center',
-      textTransform:'uppercase', letterSpacing:'.08em', margin:'6px 0 3px'}}>
-      {children}
-    </div>
-  );
+  const Sep = () => <div style={{width:'100%', height:1, background:'rgba(255,255,255,.12)', margin:'5px 0'}}/>;
+  const Lbl = ({c}) => <div style={{fontSize:9, color:'rgba(255,255,255,.4)', textAlign:'center', textTransform:'uppercase', letterSpacing:'.08em', margin:'5px 0 3px'}}>{c}</div>;
 
   return (
     <div
-      data-fmt-panel="true"
       data-export-hide="true"
-      ref={panelRef}
-      tabIndex={-1}
+      onMouseDown={panelMouseDown}
       style={{
-        width: 64,
-        height: '100%',
-        minHeight: 200,
-        background: '#1a1a1a',
-        borderRadius: '0 8px 8px 0',
-        display: 'flex', flexDirection: 'column',
-        padding: '8px 6px',
-        gap: 2,
-        boxShadow: '3px 0 12px rgba(0,0,0,.2)',
+        position: 'fixed',
+        right: 12, top: '50%',
+        transform: 'translateY(-50%)',
+        width: 60,
+        maxHeight: '85vh',
         overflowY: 'auto',
-        overflowX: 'hidden',
-        boxSizing: 'border-box',
+        background: '#1c1c1e',
+        borderRadius: 12,
+        padding: '10px 6px',
+        display: 'flex', flexDirection: 'column', gap: 3,
+        boxShadow: '0 8px 32px rgba(0,0,0,.45)',
+        border: '1px solid rgba(255,255,255,.1)',
+        zIndex: 9999,
       }}
     >
-      <Label>Estilo</Label>
-      <Btn onClick={() => fmt('bold')} title="Negrito (Ctrl+B)"><b>B</b></Btn>
-      <Btn onClick={() => fmt('italic')} title="Itálico (Ctrl+I)"><i style={{fontStyle:'italic'}}>I</i></Btn>
-      <Btn onClick={() => fmt('underline')} title="Sublinhado"><u>U</u></Btn>
-      <Btn onClick={() => fmt('strikeThrough')} title="Riscado"><s>S</s></Btn>
+      <Lbl c="Estilo"/>
+      <Btn cmd="bold"          title="Negrito (Ctrl+B)"><b>B</b></Btn>
+      <Btn cmd="italic"        title="Itálico (Ctrl+I)"><i style={{fontStyle:'italic'}}>I</i></Btn>
+      <Btn cmd="underline"     title="Sublinhado"><u>U</u></Btn>
+      <Btn cmd="strikeThrough" title="Riscado"><s>S</s></Btn>
 
       <Sep/>
-      <Label>Tamanho</Label>
+      <Lbl c="Tam."/>
 
-      {/* Botão − */}
-      <button data-fmt-panel="true"
-        onMouseDown={e => { e.preventDefault(); saveSelection(); }}
-        onClick={e => { e.preventDefault(); e.stopPropagation(); applySize(size - 8); }}
-        style={{ width:'100%', padding:'6px', border:'none', borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff', fontSize:18, fontWeight:900, cursor:'pointer', lineHeight:1 }}>
+      <button onMouseDown={panelMouseDown} onClick={() => applySize(size-8)}
+        style={{width:'100%',padding:'6px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:20,fontWeight:900,cursor:'pointer',lineHeight:1}}>
         −
       </button>
 
-      {/* Input de tamanho */}
       <input
-        data-fmt-panel="true"
+        ref={inputRef}
         type="number" min="8" max="300" step="1"
         value={sizeInput}
         onMouseDown={e => e.stopPropagation()}
-        onFocus={e => e.stopPropagation()}
+        onFocus={e => { e.stopPropagation(); saveSel(); }}
         onChange={e => setSizeInput(e.target.value)}
-        onKeyDown={e => {
-          e.stopPropagation();
-          if (e.key === 'Enter') { applySize(parseInt(sizeInput) || size); }
-        }}
-        onBlur={e => {
-          if (panelRef.current && panelRef.current.contains(e.relatedTarget)) return;
-          const v = parseInt(sizeInput);
-          if (!isNaN(v)) applySize(v);
-        }}
+        onKeyDown={e => { e.stopPropagation(); if(e.key==='Enter') applySize(parseInt(sizeInput)||size); }}
+        onBlur={() => { const v=parseInt(sizeInput); if(!isNaN(v)) applySize(v); }}
         style={{
           width:'100%', textAlign:'center', padding:'5px 2px',
           border:'1px solid rgba(255,255,255,.2)', borderRadius:6,
           background:'rgba(255,255,255,.06)', color:'#fff',
           fontSize:13, fontWeight:700, fontFamily:'ui-monospace,monospace',
-          MozAppearance:'textfield', boxSizing:'border-box',
+          boxSizing:'border-box', MozAppearance:'textfield',
         }}
       />
-      <div style={{fontSize:9, color:'rgba(255,255,255,.35)', textAlign:'center', marginTop:-2}}>px</div>
+      <div style={{fontSize:9,color:'rgba(255,255,255,.3)',textAlign:'center',marginTop:-1}}>px</div>
 
-      {/* Botão + */}
-      <button data-fmt-panel="true"
-        onMouseDown={e => { e.preventDefault(); saveSelection(); }}
-        onClick={e => { e.preventDefault(); e.stopPropagation(); applySize(size + 8); }}
-        style={{ width:'100%', padding:'6px', border:'none', borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff', fontSize:18, fontWeight:900, cursor:'pointer', lineHeight:1 }}>
+      <button onMouseDown={panelMouseDown} onClick={() => applySize(size+8)}
+        style={{width:'100%',padding:'6px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:20,fontWeight:900,cursor:'pointer',lineHeight:1}}>
         +
       </button>
 
       <Sep/>
-      <Label>Alinha</Label>
-      <Btn onClick={() => applyAlign('left')} title="Esquerda">⇤</Btn>
-      <Btn onClick={() => applyAlign('center')} title="Centro">≡</Btn>
-      <Btn onClick={() => applyAlign('right')} title="Direita">⇥</Btn>
+      <Lbl c="Alinha"/>
+      <button onMouseDown={panelMouseDown} onClick={() => applyAlign('left')}
+        title="Esquerda"
+        style={{width:'100%',padding:'6px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:13,cursor:'pointer'}}>⇤</button>
+      <button onMouseDown={panelMouseDown} onClick={() => applyAlign('center')}
+        title="Centro"
+        style={{width:'100%',padding:'6px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:13,cursor:'pointer'}}>≡</button>
+      <button onMouseDown={panelMouseDown} onClick={() => applyAlign('right')}
+        title="Direita"
+        style={{width:'100%',padding:'6px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:13,cursor:'pointer'}}>⇥</button>
 
       <Sep/>
-      <Label>Cor</Label>
-      <label data-fmt-panel="true"
-        title="Cor do texto"
-        onMouseDown={e => e.preventDefault()}
-        style={{position:'relative', cursor:'pointer', display:'block'}}>
-        <div style={{
-          width:'100%', height:32, borderRadius:6,
-          background: color,
-          border:'2px solid rgba(255,255,255,.3)',
-          boxSizing:'border-box',
-          display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <span style={{fontSize:12, fontWeight:800, color: '#fff',
-            textShadow:'0 1px 3px rgba(0,0,0,.8)'}}>A</span>
+      <Lbl c="Cor"/>
+      <label onMouseDown={panelMouseDown} style={{position:'relative',cursor:'pointer',display:'block'}}>
+        <div style={{width:'100%',height:34,borderRadius:6,background:color,border:'2px solid rgba(255,255,255,.25)',boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <span style={{fontSize:13,fontWeight:800,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,.9)'}}>A</span>
         </div>
         <input type="color" value={color}
-          data-fmt-panel="true"
           onMouseDown={e => e.stopPropagation()}
           onChange={e => applyColor(e.target.value)}
-          style={{position:'absolute', opacity:0, inset:0, cursor:'pointer', width:'100%', height:'100%'}}
+          style={{position:'absolute',opacity:0,inset:0,width:'100%',height:'100%',cursor:'pointer'}}
         />
       </label>
 
       <Sep/>
-      <Btn onClick={() => fmt('removeFormat')} title="Limpar formatação">✕</Btn>
+      <button onMouseDown={panelMouseDown} onClick={() => fmt('removeFormat')}
+        title="Limpar formatação"
+        style={{width:'100%',padding:'7px 4px',border:'none',borderRadius:6,background:'rgba(255,255,255,.08)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>✕ fmt</button>
 
-      {/* Contador de chars */}
-      <div style={{
-        marginTop:'auto', paddingTop:6,
-        fontSize:9, color:warnColor,
-        textAlign:'center', fontFamily:'ui-monospace,monospace',
-      }}>
+      <div style={{marginTop:4,fontSize:9,color:warnColor,textAlign:'center',fontFamily:'ui-monospace,monospace'}}>
         {charCount}ch
       </div>
     </div>

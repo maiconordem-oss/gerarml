@@ -311,7 +311,6 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
   const canvasRef = useRef(null);
   const [scale, setScale] = useState(0.4);
   const [hovered, setHovered] = useState(false);
-  const [textActive, setTextActive] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -323,20 +322,6 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
     const ro = new ResizeObserver(update);
     if (wrapRef.current) ro.observe(wrapRef.current);
     return () => ro.disconnect();
-  }, []);
-
-  // Escuta foco de texto — só ativa se o texto estiver neste canvas
-  useEffect(() => {
-    const handler = (e) => {
-      if (!e.detail) { setTextActive(false); return; }
-      if (canvasRef.current && canvasRef.current.contains(e.detail.el)) {
-        setTextActive(true);
-      } else {
-        setTextActive(false);
-      }
-    };
-    window.addEventListener('ml-text-focus', handler);
-    return () => window.removeEventListener('ml-text-focus', handler);
   }, []);
 
   const handleExport = async () => {
@@ -354,60 +339,28 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
         </div>
       </div>
       {extra && <div style={{marginBottom:6}}>{extra}</div>}
-
-      {/* Layout lado a lado: foto + painel de texto */}
-      <div style={{ display: 'flex', gap: 0, alignItems: 'stretch' }}>
-
-        {/* Canvas wrap */}
-        <div className="canvas-wrap" ref={wrapRef}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          style={{ position: 'relative', flex: 1, minWidth: 0 }}
-        >
-          {/* Toolbar de imagem — aparece no hover, some quando texto ativo */}
-          {imgToolbar && (
-            <div
-              data-export-hide="true"
-              style={{
-                position: 'absolute', top: 8, left: 8, right: 8,
-                zIndex: 100,
-                opacity: hovered && !textActive ? 1 : 0,
-                transform: hovered && !textActive ? 'translateY(0)' : 'translateY(-6px)',
-                transition: 'opacity .18s ease, transform .18s ease',
-                pointerEvents: hovered && !textActive ? 'auto' : 'none',
-              }}
-            >
-              {imgToolbar}
-            </div>
-          )}
-
-          <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
-            {bg && (
-              <img src={bg} alt="" style={{
-                position:'absolute', inset:0, width:'100%', height:'100%',
-                objectFit:'cover', zIndex:0, pointerEvents:'none'
-              }}/>
-            )}
-            <div style={{position:'relative', zIndex:1, width:'100%', height:'100%'}}>
-              {children}
-            </div>
+      <div className="canvas-wrap" ref={wrapRef}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ position: 'relative' }}
+      >
+        {imgToolbar && (
+          <div data-export-hide="true" style={{
+            position: 'absolute', top: 8, left: 8, right: 8, zIndex: 100,
+            opacity: hovered ? 1 : 0,
+            transform: hovered ? 'translateY(0)' : 'translateY(-6px)',
+            transition: 'opacity .18s ease, transform .18s ease',
+            pointerEvents: hovered ? 'auto' : 'none',
+          }}>
+            {imgToolbar}
+          </div>
+        )}
+        <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
+          {bg && <img src={bg} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, pointerEvents:'none' }}/>}
+          <div style={{position:'relative', zIndex:1, width:'100%', height:'100%'}}>
+            {children}
           </div>
         </div>
-
-        {/* Painel de formatação — lateral direita, fora do canvas, no tamanho real */}
-        <div
-          data-export-hide="true"
-          style={{
-            width: textActive ? 64 : 0,
-            minHeight: 200,
-            overflow: 'hidden',
-            transition: 'width .2s ease',
-            flexShrink: 0,
-          }}
-        >
-          {textActive && <window.MLTextFormatPanel />}
-        </div>
-
       </div>
     </div>
   );
@@ -1894,6 +1847,9 @@ function App() {
           onClose={() => setPreviewOpen(false)}
         />
       )}
+
+      {/* Painel de formatação de texto — fixo na lateral direita da tela */}
+      <window.MLTextFormatPanel />
 
       {cropState && (
         <window.MLCropOverlay
