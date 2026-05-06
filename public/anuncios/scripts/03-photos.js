@@ -123,6 +123,8 @@ function Photo1E({ data, set, bgMode }) {
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
       </div>
+      {/* Callout sobreposto na base */}
+      {!bgMode && <Callout titleKey="p1_callout_title" textKey="p1_callout_text" data={data} set={set} bgMode={bgMode}/>}
     </div>
   );
 }
@@ -144,10 +146,53 @@ function Photo1({ data, set, bgMode }) {
   return <Photo1A data={data} set={set} bgMode={bgMode} />;
 }
 
+
+/* ============== Callout — barra verde sobreposta na base ============== */
+function Callout({ titleKey, textKey, data, set, bgMode }) {
+  if (bgMode) {
+    return (
+      <div style={{
+        position: 'absolute', bottom: 60, left: 80, right: 80, zIndex: 20,
+        padding: '24px 32px', borderRadius: 16,
+        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', gap: 20,
+      }}>
+        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,.18)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <Ic.check style={{ width: 26, height: 26, strokeWidth: 3, color: '#fff', stroke: '#fff' }}/>
+        </div>
+        <div>
+          <Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}
+            style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, color: '#fff', display: 'block', lineHeight: 1.1 }}/>
+          <Ed value={data[textKey]} onChange={(v) => set(textKey, v)}
+            style={{ fontFamily: 'Montserrat', fontSize: 21, color: 'rgba(255,255,255,.92)', display: 'block', marginTop: 4, lineHeight: 1.3 }}/>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      position: 'absolute', bottom: 60, left: 80, right: 80, zIndex: 20,
+      background: 'var(--green,#1F7A3A)', borderRadius: 16,
+      padding: '22px 28px', display: 'flex', alignItems: 'center', gap: 18,
+      boxShadow: '0 8px 28px rgba(0,0,0,.18)',
+    }}>
+      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,.18)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+        <Ic.check style={{ width: 26, height: 26, strokeWidth: 3.5, color: '#fff', stroke: '#fff' }}/>
+      </div>
+      <div>
+        <Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}
+          style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, color: '#fff', display: 'block', lineHeight: 1.1 }}/>
+        <Ed value={data[textKey]} onChange={(v) => set(textKey, v)}
+          style={{ fontFamily: 'Montserrat', fontSize: 21, color: 'rgba(255,255,255,.92)', display: 'block', marginTop: 4, lineHeight: 1.3 }}/>
+      </div>
+    </div>
+  );
+}
+
 /* ============== Photo 2: Características principais ============== */
 function Photo2({ data, set, bgMode }) {
   return (
-    <div className="tpl" style={{ padding: '80px 80px 60px', background: bgMode ? 'transparent' : undefined }}>
+    <div className="tpl" style={{ padding: '80px 80px 60px', background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
       <div style={{ position: 'relative', flex: 1 }}>
         <Drag id="p2_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p2_ic1" data={data} set={set} title={data.p2_f1_title} text={data.p2_f1_text}
@@ -170,22 +215,7 @@ function Photo2({ data, set, bgMode }) {
         <Arrow d="M 78,16 C 68,28 64,36 56,46" />
         <Arrow d="M 28,72 C 34,68 38,62 44,54" /></>}
       </div>
-      <Drag id="p2_callout" data={data} set={set} enabled={bgMode} style={bgMode ? {} : undefined}>
-      {bgMode ? (
-        <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'left', maxWidth: 900, marginRight: 'auto' }}>
-          <Ed value={data.p2_callout_title} onChange={(v) => set('p2_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 40, fontWeight: 800, display: 'block', lineHeight: 1.1, color: '#fff', maxHeight: 88, overflow: 'hidden' }} />
-          <Ed value={data.p2_callout_text} onChange={(v) => set('p2_callout_text', v)} style={{ fontSize: 28, opacity: .95, lineHeight: 1.3, color: '#fff', display: 'block', maxHeight: 73, overflow: 'hidden' }} />
-        </div>
-      ) : (
-      <div className="callout">
-        <div className="ic"><Ic.check style={{ width: 30, height: 30, strokeWidth: 3.5 }} /></div>
-        <div className="txt">
-          <Ed value={data.p2_callout_title} onChange={(v) => set('p2_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, display: 'block', lineHeight: 1.1 }} />
-          <Ed value={data.p2_callout_text} onChange={(v) => set('p2_callout_text', v)} style={{ fontSize: 21, opacity: .95, lineHeight: 1.3 }} />
-        </div>
-      </div>
-      )}
-      </Drag>
+      <Callout titleKey="p2_callout_title" textKey="p2_callout_text" data={data} set={set} bgMode={bgMode}/>
     </div>);
 
 }
@@ -223,7 +253,7 @@ function Feat({ icon, iconKey, data, set, title, text, align = "left", onTitle, 
 /* ============== Photo 3: Dimensões / Specs ============== */
 function Photo3({ data, set, bgMode }) {
   return (
-    <div className="tpl" style={{ padding: '80px 90px 60px', width: "1200px", height: "1540px", background: bgMode ? 'transparent' : undefined }}>
+    <div className="tpl" style={{ padding: '80px 90px 60px', width: "1200px", height: "1540px", background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
       <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1 }}>
         <Ed value={data.p3_title_a} onChange={(v) => set('p3_title_a', v)} className="green" />
         {' '}
@@ -258,22 +288,7 @@ function Photo3({ data, set, bgMode }) {
         <Arrow d="M 30,52 C 40,52 50,52 58,52" /></>}
       </div>
 
-      <Drag id="p3_callout" data={data} set={set} enabled={bgMode}>
-      {bgMode ? (
-        <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'left', maxWidth: 900, marginRight: 'auto' }}>
-          <Ed value={data.p3_callout_title} onChange={(v) => set('p3_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 40, fontWeight: 800, display: 'block', lineHeight: 1.1, color: '#fff', maxHeight: 88, overflow: 'hidden' }} />
-          <Ed value={data.p3_callout_text} onChange={(v) => set('p3_callout_text', v)} style={{ fontSize: 28, opacity: .95, lineHeight: 1.3, color: '#fff', display: 'block', maxHeight: 73, overflow: 'hidden' }} />
-        </div>
-      ) : (
-      <div className="callout">
-        <div className="ic"><Ic.alert style={{ width: 28, height: 28 }} /></div>
-        <div className="txt">
-          <Ed value={data.p3_callout_title} onChange={(v) => set('p3_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, display: 'block', lineHeight: 1.1 }} />
-          <Ed value={data.p3_callout_text} onChange={(v) => set('p3_callout_text', v)} style={{ fontSize: 21, opacity: .95, lineHeight: 1.3 }} />
-        </div>
-      </div>
-      )}
-      </Drag>
+      <Callout titleKey="p3_callout_title" textKey="p3_callout_text" data={data} set={set} bgMode={bgMode}/>
     </div>);
 
 }
@@ -342,27 +357,7 @@ function Photo4({ data, set, bgMode }) {
         </div>
       </div>
 
-      {/* Callout — fixo na base */}
-      <div style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
-        {bgMode ? (
-          <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'center', maxWidth: 900, margin: '0 auto' }}>
-            <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)}
-              style={{ fontFamily: 'Montserrat', fontSize: 40, fontWeight: 800, display: 'block', lineHeight: 1.1, color: '#fff' }} />
-            <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)}
-              style={{ fontSize: 28, opacity: .95, lineHeight: 1.3, color: '#fff', display: 'block' }} />
-          </div>
-        ) : (
-          <div className="callout">
-            <div className="ic"><Ic.check style={{ width: 30, height: 30, strokeWidth: 3.5 }} /></div>
-            <div className="txt">
-              <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)}
-                style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, display: 'block', lineHeight: 1.1 }} />
-              <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)}
-                style={{ fontSize: 21, opacity: .95, lineHeight: 1.3 }} />
-            </div>
-          </div>
-        )}
-      </div>
+      <Callout titleKey="p4_callout_title" textKey="p4_callout_text" data={data} set={set} bgMode={bgMode}/>
 
     </div>);
 }

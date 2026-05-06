@@ -13,6 +13,8 @@ const INITIAL = {
   p1_zoom: 1, p2_zoom: 1, p3_zoom: 1, p4_zoom: 1, p5_zoom: 1, p6_zoom: 1,
   p1_corner4: '',
   p1_variant: 'A',
+  p1_callout_title: 'Qualidade garantida:',
+  p1_callout_text: 'Produto com nota fiscal e suporte técnico incluso.',
   p1e_spot: { img: '', x: 60, y: 58, size: 340 },
 
   p2_f1_title: 'Sistema manual:',
