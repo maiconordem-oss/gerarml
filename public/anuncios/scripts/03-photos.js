@@ -23,21 +23,9 @@ function BgPlaceholder({ style = {} }) {
   );
 }
 
-/* ZoomedImg substituído por PanZoom (MLPanZoomImg) — suporta pan + zoom */
 
-/* ---- VARIANTE A: 3 círculos (atual) ---- */
-/* ============== Callout — barra verde sobreposta na base ============== */
-function Callout({ titleKey, textKey, data, set, bgMode }) {
-  if (bgMode) {
-    return (
-      <div className="callout" style={{ background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', marginTop: 'auto' }}>
-        <div className="txt">
-          <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
-          <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
-        </div>
-      </div>
-    );
-  }
+/* ============== Callout — barra base padronizada ============== */
+function Callout({ titleKey, textKey, data, set }) {
   return (
     <div className="callout">
       <div className="txt">
@@ -48,7 +36,9 @@ function Callout({ titleKey, textKey, data, set, bgMode }) {
   );
 }
 
+/* ZoomedImg substituído por PanZoom (MLPanZoomImg) — suporta pan + zoom */
 
+/* ---- VARIANTE A: 3 círculos (atual) ---- */
 function Photo1A({ data, set, bgMode }) {
   const circles = data.p1_circles || [];
   return (
@@ -167,11 +157,10 @@ function Photo1({ data, set, bgMode }) {
   return <Photo1A data={data} set={set} bgMode={bgMode} />;
 }
 
-
 /* ============== Photo 2: Características principais ============== */
 function Photo2({ data, set, bgMode }) {
   return (
-    <div className="tpl" style={{ padding: '80px 80px 60px', background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
+    <div className="tpl" style={{ padding: '80px 80px 60px', background: bgMode ? 'transparent' : undefined }}>
       <div style={{ position: 'relative', flex: 1 }}>
         <Drag id="p2_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p2_ic1" data={data} set={set} title={data.p2_f1_title} text={data.p2_f1_text}
@@ -194,7 +183,7 @@ function Photo2({ data, set, bgMode }) {
         <Arrow d="M 78,16 C 68,28 64,36 56,46" />
         <Arrow d="M 28,72 C 34,68 38,62 44,54" /></>}
       </div>
-      <Callout titleKey="p2_callout_title" textKey="p2_callout_text" data={data} set={set} bgMode={bgMode}/>
+      <Callout titleKey="p2_callout_title" textKey="p2_callout_text" data={data} set={set}/>
     </div>);
 
 }
@@ -232,7 +221,7 @@ function Feat({ icon, iconKey, data, set, title, text, align = "left", onTitle, 
 /* ============== Photo 3: Dimensões / Specs ============== */
 function Photo3({ data, set, bgMode }) {
   return (
-    <div className="tpl" style={{ padding: '80px 90px 60px', width: "1200px", height: "1540px", background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
+    <div className="tpl" style={{ padding: '80px 90px 60px', width: "1200px", height: "1540px", background: bgMode ? 'transparent' : undefined }}>
       <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1 }}>
         <Ed value={data.p3_title_a} onChange={(v) => set('p3_title_a', v)} className="green" />
         {' '}
@@ -267,7 +256,7 @@ function Photo3({ data, set, bgMode }) {
         <Arrow d="M 30,52 C 40,52 50,52 58,52" /></>}
       </div>
 
-      <Callout titleKey="p3_callout_title" textKey="p3_callout_text" data={data} set={set} bgMode={bgMode}/>
+      <Callout titleKey="p3_callout_title" textKey="p3_callout_text" data={data} set={set}/>
     </div>);
 
 }
@@ -336,7 +325,7 @@ function Photo4({ data, set, bgMode }) {
         </div>
       </div>
 
-      <Callout titleKey="p4_callout_title" textKey="p4_callout_text" data={data} set={set} bgMode={bgMode}/>
+      <Callout titleKey="p4_callout_title" textKey="p4_callout_text" data={data} set={set}/>
 
     </div>);
 }
