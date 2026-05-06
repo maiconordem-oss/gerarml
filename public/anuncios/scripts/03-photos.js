@@ -149,19 +149,19 @@ function Photo2({ data, set, bgMode }) {
   return (
     <div className="tpl" style={{ padding: '80px 80px 60px', background: bgMode ? 'transparent' : undefined }}>
       <div style={{ position: 'relative', flex: 1 }}>
-        <Drag id="p2_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, left: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p2_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p2_ic1" data={data} set={set} title={data.p2_f1_title} text={data.p2_f1_text}
           onTitle={(v) => set('p2_f1_title', v)} onText={(v) => set('p2_f1_text', v)} />
         </Drag>
-        <Drag id="p2_f2" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, right: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p2_f2" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 0, right: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat align="right" iconKey="p2_ic2" data={data} set={set} title={data.p2_f2_title} text={data.p2_f2_text}
           onTitle={(v) => set('p2_f2_title', v)} onText={(v) => set('p2_f2_text', v)} />
         </Drag>
-        <Drag id="p2_f3" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', bottom: 80, left: 60, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p2_f3" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', bottom: 80, left: 60, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p2_ic3" data={data} set={set} title={data.p2_f3_title} text={data.p2_f3_text}
           onTitle={(v) => set('p2_f3_title', v)} onText={(v) => set('p2_f3_text', v)} />
         </Drag>
-        <Drag id="p2_f4" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', bottom: 80, right: 60, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p2_f4" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', bottom: 80, right: 60, maxWidth: 380, zIndex: 10 }}>
           <Feat align="right" iconKey="p2_ic4" data={data} set={set} title={data.p2_f4_title} text={data.p2_f4_text}
           onTitle={(v) => set('p2_f4_title', v)} onText={(v) => set('p2_f4_text', v)} />
         </Drag>
@@ -236,19 +236,19 @@ function Photo3({ data, set, bgMode }) {
       </h1>
 
       <div style={{ position: 'relative', flex: 1, marginTop: 50 }}>
-        <Drag id="p3_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 20, left: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p3_f1" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 20, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p3_ic1" data={data} set={set} title={data.p3_f1_title} text={data.p3_f1_text}
           onTitle={(v) => set('p3_f1_title', v)} onText={(v) => set('p3_f1_text', v)} />
         </Drag>
-        <Drag id="p3_f2" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 220, left: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p3_f2" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 220, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p3_ic2" data={data} set={set} title={data.p3_f2_title} text={data.p3_f2_text}
           onTitle={(v) => set('p3_f2_title', v)} onText={(v) => set('p3_f2_text', v)} />
         </Drag>
-        <Drag id="p3_f3" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 420, left: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p3_f3" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 420, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p3_ic3" data={data} set={set} title={data.p3_f3_title} text={data.p3_f3_text}
           onTitle={(v) => set('p3_f3_title', v)} onText={(v) => set('p3_f3_text', v)} />
         </Drag>
-        <Drag id="p3_f4" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 620, left: 0, maxWidth: 380, zIndex: 2 }}>
+        <Drag id="p3_f4" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', top: 620, left: 0, maxWidth: 380, zIndex: 10 }}>
           <Feat iconKey="p3_ic4" data={data} set={set} title={data.p3_f4_title} text={data.p3_f4_text}
           onTitle={(v) => set('p3_f4_title', v)} onText={(v) => set('p3_f4_text', v)} />
         </Drag>

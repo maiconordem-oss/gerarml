@@ -432,7 +432,7 @@ function IconPicker({ iconKey, data, set, size=110, borderRadius=22 }) {
       </div>
       {open && (
         <React.Fragment>
-          <div data-export-hide="true" style={{ position:'absolute', top:size+6, left:0, zIndex:600, background:'white', border:'1px solid #e5e7eb', borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,.16)', padding:10, display:'grid', gridTemplateColumns:'repeat(5, 44px)', gap:6, minWidth:250 }}>
+          <div data-export-hide="true" style={{ position:'absolute', top:size+6, left:0, zIndex:9999, background:'white', border:'1px solid #e5e7eb', borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,.16)', padding:10, display:'grid', gridTemplateColumns:'repeat(5, 44px)', gap:6, minWidth:250 }}>
             {ICON_LIST.map(name => {
               const Ic = I[name]; if (!Ic) return null;
               return (
