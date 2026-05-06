@@ -421,10 +421,11 @@ function ImgAdjustBar({ slotKey, data, set }) {
 /* =============== ICON PICKER =============== */
 const ICON_LIST = ['gear','shield','tools','target','feather','check','alert','star','ruler','bolt','leaf','diamond','package','truck'];
 
-function IconPicker({ iconKey, data, set, size=110, borderRadius=22 }) {
+function IconPicker({ iconKey, data, set, size=110, borderRadius=22, iconSize }) {
   const [open, setOpen] = useState(false);
   const currentIcon = (data && data[iconKey]) || 'gear';
   const IcEl = I[currentIcon] || I.gear;
+  const svgSize = iconSize || Math.round(size * 0.62);
 
   return (
     <div style={{ position:'relative', flexShrink:0 }}>
@@ -432,7 +433,7 @@ function IconPicker({ iconKey, data, set, size=110, borderRadius=22 }) {
         onClick={() => setOpen(v => !v)}
         style={{ width:size, height:size, borderRadius, cursor:'pointer', outline: open ? '3px solid #3b82f6' : 'none', outlineOffset:2, position:'relative' }}
         title="Clique para trocar o ícone">
-        <IcEl style={{ width:size*0.56, height:size*0.56, color:'#fff', stroke:'#fff' }}/>
+        <IcEl style={{ width:svgSize, height:svgSize, color:'#fff', stroke:'#fff' }}/>
         <div data-export-hide="true" style={{ position:'absolute', bottom:3, right:3, width:18, height:18, borderRadius:'50%', background:'rgba(0,0,0,.35)', display:'grid', placeItems:'center', fontSize:9, color:'#fff', fontWeight:800 }}>✎</div>
       </div>
       {open && (

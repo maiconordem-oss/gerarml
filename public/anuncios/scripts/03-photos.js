@@ -205,18 +205,17 @@ function Arrow({ d, color = "#1F7A3A" }) {
 }
 
 function Feat({ icon, iconKey, data, set, title, text, align = "left", onTitle, onText }) {
-  const defaultIcon = iconKey ? (data && data[iconKey]) || 'gear' : null;
   return (
     <div style={{ maxWidth: 750, marginLeft: align === 'right' ? 'auto' : 0, display: 'flex', alignItems: 'flex-start', gap: 18, flexDirection: align === 'right' ? 'row-reverse' : 'row' }}>
       {iconKey && data && set
-        ? <IcPicker iconKey={iconKey} data={data} set={set} size={110} borderRadius={22}/>
-        : <div className="ic-square" style={{ width: 110, height: 110, borderRadius: 22, flexShrink: 0 }}>
-            {icon && React.cloneElement(icon, { style: { width: 62, height: 62, color: '#fff', stroke: '#fff' } })}
+        ? <IcPicker iconKey={iconKey} data={data} set={set} size={126} borderRadius={24} iconSize={84}/>
+        : <div className="ic-square" style={{ width: 126, height: 126, borderRadius: 24, flexShrink: 0 }}>
+            {icon && React.cloneElement(icon, { style: { width: 84, height: 84, color: '#fff', stroke: '#fff' } })}
           </div>
       }
       <div style={{ flex: 1, textAlign: align, minWidth: 0 }}>
-        <Ed value={title} onChange={onTitle} style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: 'var(--green,#1F7A3A)', lineHeight: 1, display: 'block', whiteSpace: 'nowrap' }} />
-        <Ed value={text} onChange={onText} multi style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', marginTop: 8, display: 'block' }} />
+        <Ed value={title} onChange={onTitle} style={{ fontFamily: '"Montserrat", sans-serif', fontSize: 26.5, fontWeight: 800, color: 'var(--green,#1F7A3A)', lineHeight: 1.1, display: 'block', whiteSpace: 'nowrap' }} />
+        <Ed value={text} onChange={onText} multi style={{ fontFamily: '"Montserrat", sans-serif', fontSize: 20.5, lineHeight: 1.3, color: '#1A1A1A', marginTop: 8, display: 'block' }} />
       </div>
     </div>);
 }
@@ -324,7 +323,7 @@ function Photo4({ data, set, bgMode }) {
         gap: 32, marginBottom: 30,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
-          <IcPicker iconKey="p4_ic1" data={data} set={set} size={110} borderRadius={22}/>
+          <IcPicker iconKey="p4_ic1" data={data} set={set} size={126} borderRadius={24} iconSize={84}/>
           <div style={{ minWidth: 0, flex: 1 }}>
             <Ed value={data.p4_b1_title} onChange={(v) => set('p4_b1_title', v)}
               style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: 'var(--green,#1F7A3A)', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
@@ -333,7 +332,7 @@ function Photo4({ data, set, bgMode }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexDirection: 'row-reverse' }}>
-          <IcPicker iconKey="p4_ic2" data={data} set={set} size={110} borderRadius={22}/>
+          <IcPicker iconKey="p4_ic2" data={data} set={set} size={126} borderRadius={24} iconSize={84}/>
           <div style={{ minWidth: 0, flex: 1, textAlign: 'right' }}>
             <Ed value={data.p4_b2_title} onChange={(v) => set('p4_b2_title', v)}
               style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: 'var(--green,#1F7A3A)', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
