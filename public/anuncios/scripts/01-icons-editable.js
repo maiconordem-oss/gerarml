@@ -172,56 +172,142 @@ async function exportCanvas(node, filename) {
   }
 }
 
-/* =============== PAN + ZOOM IMAGE =============== */
+/* =============== PAN + ZOOM IMAGE — livre, sem clip ===============
+   O produto flutua em position:absolute sobre o canvas inteiro.
+   - Arrastar: move livremente por todo o canvas (sem clip)
+   - Scroll / wheel: zoom centrado no cursor
+   - Zoom externo (ZoomBar): continua funcionando via prop zoom
+   Estado salvo em panKey = { x, y, scale }
+   wrapStyle ainda aceito para compatibilidade mas ignorado (posição livre)
+*/
 function PanZoomImg({ src, zoom=1, panKey, data, set, wrapStyle={}, disabled=false }) {
-  const pan = (panKey && data && data[panKey]) || { x:0, y:0 };
-  const ref = useRef(null);
+  // Estado: { x, y, scale } — x/y em px no canvas (1200×1540), scale multiplicador
+  const state = (panKey && data && data[panKey]) || { x:0, y:0, scale:1 };
+  const imgRef = useRef(null);
   const dragging = useRef(false);
+  const lastZoom = useRef(zoom);
 
-  const getScale = () => {
-    let el = ref.current;
+  // Quando zoom externo muda, propaga pro scale interno proporcionalmente
+  useEffect(() => {
+    if (!set || !panKey) return;
+    if (Math.abs(zoom - lastZoom.current) < 0.001) return;
+    const ratio = zoom / (lastZoom.current || 1);
+    lastZoom.current = zoom;
+    set(panKey, { ...state, scale: (state.scale || 1) * ratio });
+  }, [zoom]);
+
+  // Descobrir o scale visual do canvas (para converter coords do mouse)
+  const getCanvasScale = () => {
+    let el = imgRef.current;
     while (el && !(el.classList && el.classList.contains('canvas'))) el = el.parentElement;
     const rect = el && el.getBoundingClientRect();
     return rect ? rect.width / 1200 : 1;
   };
 
+  // ── Drag ──
   const onMouseDown = (e) => {
     if (disabled || !set || !panKey) return;
     e.preventDefault(); e.stopPropagation();
     dragging.current = true;
     const startX = e.clientX, startY = e.clientY;
-    const startPan = { ...pan };
-    const scale = getScale();
+    const startState = { ...state };
+    const canvasScale = getCanvasScale();
     const onMove = (ev) => {
       if (!dragging.current) return;
-      set(panKey, { x: startPan.x + (ev.clientX-startX)/scale, y: startPan.y + (ev.clientY-startY)/scale });
+      set(panKey, {
+        ...startState,
+        x: startState.x + (ev.clientX - startX) / canvasScale,
+        y: startState.y + (ev.clientY - startY) / canvasScale,
+      });
     };
-    const onUp = () => { dragging.current = false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
 
-  if (!src) return (
-    <div style={{ background:'repeating-linear-gradient(-45deg,#EFEFEF 0 12px,#E6E6E6 12px 24px)', display:'grid', placeItems:'center', color:'#bbb', fontSize:13, fontFamily:'ui-monospace,monospace', borderRadius:8, ...wrapStyle }}/>
-  );
+  // ── Scroll / wheel zoom ──
+  const onWheel = (e) => {
+    if (disabled || !set || !panKey) return;
+    e.preventDefault(); e.stopPropagation();
+    const canvasScale = getCanvasScale();
+    const delta = e.deltaY < 0 ? 1.08 : 0.93;
+    const curScale = state.scale || 1;
+    const newScale = Math.max(0.05, Math.min(8, curScale * delta));
 
-  const pct = Math.round(zoom*100)+'%';
-  const canPan = !disabled && set && panKey;
+    // Zoom centrado no cursor: ajusta x/y para que o ponto sob o cursor não mova
+    const el = imgRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      // posição do cursor relativa ao centro da imagem, em coords canvas
+      const mx = (e.clientX - rect.left - rect.width / 2) / canvasScale;
+      const my = (e.clientY - rect.top - rect.height / 2) / canvasScale;
+      const ratio = newScale / curScale;
+      set(panKey, {
+        x: state.x + mx - mx * ratio,
+        y: state.y + my - my * ratio,
+        scale: newScale,
+      });
+    } else {
+      set(panKey, { ...state, scale: newScale });
+    }
+  };
+
+  // ── Render vazio ──
+  if (!src) return null;
+
+  const sc = state.scale || 1;
+  const canInteract = !disabled && set && panKey;
+
+  // Tamanho base da imagem: 800px de largura no canvas (ajustável via scale)
+  const BASE = 800;
 
   return (
-    <div ref={ref} style={{ overflow:'hidden', display:'grid', placeItems:'center', cursor: canPan ? 'grab' : 'default', position:'relative', ...wrapStyle }}
-      onMouseDown={onMouseDown} title={canPan ? 'Arraste para reposicionar' : undefined}>
-      <img src={src} alt="" draggable={false} style={{
-        width:pct, height:pct, objectFit:'contain', display:'block',
-        transform:'translate('+pan.x+'px,'+pan.y+'px)',
-        pointerEvents:'none', userSelect:'none',
-      }}/>
-      {canPan && (pan.x !== 0 || pan.y !== 0) && (
-        <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); set(panKey,{x:0,y:0}); }}
+    <div
+      ref={imgRef}
+      data-panzoom="true"
+      onMouseDown={onMouseDown}
+      onWheel={onWheel}
+      style={{
+        position: 'absolute',
+        // Centro do canvas como origem, depois translate por x/y
+        left: '50%',
+        top: '50%',
+        width: BASE * sc,
+        height: 'auto',
+        transform: `translate(calc(-50% + ${state.x}px), calc(-50% + ${state.y}px))`,
+        cursor: canInteract ? (dragging.current ? 'grabbing' : 'grab') : 'default',
+        zIndex: 5,
+        userSelect: 'none',
+        touchAction: 'none',
+      }}
+      title={canInteract ? 'Arraste para mover · Scroll para zoom' : undefined}
+    >
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        style={{ width: '100%', height: 'auto', display: 'block', pointerEvents: 'none' }}
+      />
+      {/* Indicador de reset — só aparece quando movido/escalado */}
+      {canInteract && (state.x !== 0 || state.y !== 0 || Math.abs(sc - 1) > 0.05) && (
+        <div
           data-export-hide="true"
-          style={{ position:'absolute', bottom:6, right:6, fontSize:10, fontWeight:700, padding:'3px 8px', border:'1px solid rgba(0,0,0,.2)', borderRadius:5, background:'rgba(255,255,255,.9)', color:'#555', cursor:'pointer', zIndex:20 }}>
-          reset pan
-        </button>
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); set(panKey, { x:0, y:0, scale:1 }); }}
+          style={{
+            position: 'absolute', top: -28, right: 0,
+            fontSize: 10, fontWeight: 700, padding: '3px 8px',
+            border: '1px solid rgba(255,255,255,.5)', borderRadius: 5,
+            background: 'rgba(0,0,0,.6)', color: '#fff',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          ↺ reset
+        </div>
       )}
     </div>
   );
