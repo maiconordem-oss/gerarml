@@ -156,8 +156,9 @@ async function exportCanvas(node, filename) {
     await new Promise(r => setTimeout(r, 80));
     const fontEmbedCSS = await buildLocalFontEmbedCSS();
     const dataUrl = await window.htmlToImage.toPng(node, {
-      width: 1200, height: 1540, pixelRatio: 1, cacheBust: true,
+      width: 1200, height: 1540, pixelRatio: 1,
       fontEmbedCSS, imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
+      // cacheBust removido — causava re-fetch de URLs externas no export
     });
     node.style.transform = prevTransform;
     node.classList.remove('exporting');

@@ -1503,7 +1503,7 @@ function MLPreviewModal({ data, productName, onClose }) {
       await new Promise(r => setTimeout(r, 40));
       try {
         const url = await window.htmlToImage.toPng(node, {
-          width: 1200, height: 1540, pixelRatio: 0.15, cacheBust: true,
+          width: 1200, height: 1540, pixelRatio: 0.15,
           imagePlaceholder: TRANSPARENT,
         });
         return url;
