@@ -1319,12 +1319,57 @@ function AdManager({ data, productName, storeName, onLoad, setProductName, setSt
   );
 }
 
+
+/* ============== Barra de Rotação e Crop ============== */
+function RotateCropBar({ imgKey, data, set, openCrop, rotateImg }) {
+  const [rotating, setRotating] = React.useState(false);
+  const hasImg = !!(data && data[imgKey]);
+
+  const doRotate = async (deg) => {
+    if (!hasImg || rotating) return;
+    setRotating(true);
+    try { await rotateImg(imgKey, deg); } catch(_) {}
+    setRotating(false);
+  };
+
+  const btnStyle = (disabled) => ({
+    padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: 6,
+    background: 'white', fontSize: 11, fontWeight: 700,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    color: disabled ? '#d1d5db' : '#555', display: 'flex', alignItems: 'center', gap: 3,
+  });
+
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <button
+        onClick={() => doRotate(270)}
+        disabled={!hasImg || rotating}
+        style={btnStyle(!hasImg || rotating)}
+        title="Girar 90° anti-horário"
+      >↺</button>
+      <button
+        onClick={() => doRotate(90)}
+        disabled={!hasImg || rotating}
+        style={btnStyle(!hasImg || rotating)}
+        title="Girar 90° horário"
+      >↻</button>
+      <button
+        onClick={() => hasImg && openCrop(imgKey)}
+        disabled={!hasImg}
+        style={btnStyle(!hasImg)}
+        title="Recortar imagem"
+      >✂ Crop</button>
+    </div>
+  );
+}
+
 function App() {
   const [data, setData] = useState(() => ({ ...INITIAL, ...loadSavedBgs() }));
   const [productName, setProductName] = useState(TWEAK_DEFAULTS.productName);
   const [storeName, setStoreName] = useState(TWEAK_DEFAULTS.storeName);
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
   const [rawFiles, setRawFiles] = React.useState([]);
+  const [cropState, setCropState] = React.useState(null); // { key, src }
   const [apiKey, setApiKey] = React.useState(() => {
     const saved = localStorage.getItem('openai_api_key') || '';
     if (saved) window.OPENAI_API_KEY = saved;
@@ -1333,8 +1378,27 @@ function App() {
 
   const set = (k, v) => {
     setData(prev => ({...prev, [k]: v}));
-    // Persiste automaticamente se for fundo
     if (BG_KEYS.includes(k)) saveBg(k, v);
+  };
+
+  // Abrir crop para mainImg ou outra chave de imagem
+  const openCrop = (imgKey) => {
+    const src = data[imgKey];
+    if (!src) return;
+    setCropState({ key: imgKey, src });
+  };
+
+  const handleCropConfirm = (croppedDataUrl) => {
+    if (cropState) set(cropState.key, croppedDataUrl);
+    setCropState(null);
+  };
+
+  // Rotação via canvas
+  const rotateImg = async (imgKey, degrees) => {
+    const src = data[imgKey];
+    if (!src || !window.MLRotateImage) return;
+    const rotated = await window.MLRotateImage(src, degrees);
+    set(imgKey, rotated);
   };
   const merge = (patch) => setData(prev => ({...prev, ...patch}));
 
@@ -1350,6 +1414,7 @@ function App() {
           <p>6 fotos padrão · {productName} · {storeName} · clique no texto para editar · ↓ PNG salva 1200×1540</p>
         </div>
         <div className="header-actions">
+          <window.MLBrandColorPicker />
           <button className="btn" onClick={() => setTweaksOpen(v => !v)}>{tweaksOpen ? 'Fechar Tweaks' : 'Abrir Tweaks'}</button>
           <button className="btn primary" onClick={async () => {
             const canvases = document.querySelectorAll('.canvas');
@@ -1375,6 +1440,8 @@ function App() {
               <ClipboardBar hasImg={!!data.mainImg}
                 onCopy={() => { window._imgClipboard = data.mainImg; }}
                 onPaste={(img) => set('mainImg', img)}/>
+              <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+              <window.MLImgAdjustBar slotKey="p1" data={data} set={set}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
                 label="✦ Gerar estúdio" title="Gera foto com fundo branco de estúdio (~$0.04)"
                 promptKeys={[1]}/>
@@ -1389,6 +1456,8 @@ function App() {
             <ClipboardBar hasImg={!!data.mainImg}
               onCopy={() => { window._imgClipboard = data.mainImg; }}
               onPaste={(img) => set('mainImg', img)}/>
+            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <window.MLImgAdjustBar slotKey="p2" data={data} set={set}/>
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar produto + 2 closes" title="Produto com 2 miniaturas de close integradas (~$0.04)"
               promptKeys={[2]}/>
@@ -1402,6 +1471,8 @@ function App() {
             <ClipboardBar hasImg={!!data.mainImg}
               onCopy={() => { window._imgClipboard = data.mainImg; }}
               onPaste={(img) => set('mainImg', img)}/>
+            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <window.MLImgAdjustBar slotKey="p3" data={data} set={set}/>
             <span style={{fontSize:11,color:'#6b7280',fontStyle:'italic'}}>Usa foto 1 (sem custo)</span>
           </div>}>
           <MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/>
@@ -1413,6 +1484,8 @@ function App() {
             <ClipboardBar hasImg={!!data.mainImg}
               onCopy={() => { window._imgClipboard = data.mainImg; }}
               onPaste={(img) => set('mainImg', img)}/>
+            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <window.MLImgAdjustBar slotKey="p4" data={data} set={set}/>
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar lifestyle" title="Produto em uso no ambiente real (~$0.04)"
               promptKeys={[4]}/>
@@ -1426,6 +1499,8 @@ function App() {
             <ClipboardBar hasImg={!!data.mainImg}
               onCopy={() => { window._imgClipboard = data.mainImg; }}
               onPaste={(img) => set('mainImg', img)}/>
+            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <window.MLImgAdjustBar slotKey="p5" data={data} set={set}/>
           </div>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
@@ -1436,10 +1511,20 @@ function App() {
             <ClipboardBar hasImg={!!data.mainImg}
               onCopy={() => { window._imgClipboard = data.mainImg; }}
               onPaste={(img) => set('mainImg', img)}/>
+            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <window.MLImgAdjustBar slotKey="p6" data={data} set={set}/>
           </div>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
       </div>
+
+      {cropState && (
+        <window.MLCropOverlay
+          src={cropState.src}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropState(null)}
+        />
+      )}
 
       {tweaksOpen && (
         <TweaksUI data={data} set={set}
