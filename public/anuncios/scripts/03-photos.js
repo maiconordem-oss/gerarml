@@ -151,39 +151,19 @@ function Photo1({ data, set, bgMode }) {
 function Callout({ titleKey, textKey, data, set, bgMode }) {
   if (bgMode) {
     return (
-      <div style={{
-        position: 'absolute', bottom: 60, left: 80, right: 80, zIndex: 20,
-        padding: '24px 32px', borderRadius: 16,
-        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'center', gap: 20,
-      }}>
-        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,.18)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <Ic.check style={{ width: 26, height: 26, strokeWidth: 3, color: '#fff', stroke: '#fff' }}/>
-        </div>
-        <div>
-          <Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}
-            style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, color: '#fff', display: 'block', lineHeight: 1.1 }}/>
-          <Ed value={data[textKey]} onChange={(v) => set(textKey, v)}
-            style={{ fontFamily: 'Montserrat', fontSize: 21, color: 'rgba(255,255,255,.92)', display: 'block', marginTop: 4, lineHeight: 1.3 }}/>
+      <div className="callout" style={{ background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', marginTop: 'auto' }}>
+        <div className="txt">
+          <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
+          <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
         </div>
       </div>
     );
   }
   return (
-    <div style={{
-      position: 'absolute', bottom: 60, left: 80, right: 80, zIndex: 20,
-      background: 'var(--green,#1F7A3A)', borderRadius: 16,
-      padding: '22px 28px', display: 'flex', alignItems: 'center', gap: 18,
-      boxShadow: '0 8px 28px rgba(0,0,0,.18)',
-    }}>
-      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,.18)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-        <Ic.check style={{ width: 26, height: 26, strokeWidth: 3.5, color: '#fff', stroke: '#fff' }}/>
-      </div>
-      <div>
-        <Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}
-          style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, color: '#fff', display: 'block', lineHeight: 1.1 }}/>
-        <Ed value={data[textKey]} onChange={(v) => set(textKey, v)}
-          style={{ fontFamily: 'Montserrat', fontSize: 21, color: 'rgba(255,255,255,.92)', display: 'block', marginTop: 4, lineHeight: 1.3 }}/>
+    <div className="callout">
+      <div className="txt">
+        <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
+        <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
       </div>
     </div>
   );
