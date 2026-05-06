@@ -1,17 +1,9 @@
-"use strict";
-
-function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
 /* global React, MLIcons, MLEditable, MLPanZoomImg, MLIconPicker, MLImgAdjustBar */
-var Ic = window.MLIcons;
-var Ed = window.MLEditable;
-var Drag = window.MLDraggable;
-var PanZoom = window.MLPanZoomImg;
-var IcPicker = window.MLIconPicker;
+const Ic = window.MLIcons;
+const Ed = window.MLEditable;
+const Drag = window.MLDraggable;
+const PanZoom = window.MLPanZoomImg;
+const IcPicker = window.MLIconPicker;
 
 /* ============================================================
    CAPA — 3 VARIANTES (sem texto)
@@ -19,11 +11,11 @@ var IcPicker = window.MLIconPicker;
    ============================================================ */
 
 /* helper: placeholder sem texto */
-function BgPlaceholder(_ref) {
-  var _ref$style = _ref.style,
-    style = _ref$style === void 0 ? {} : _ref$style;
+function BgPlaceholder({
+  style = {}
+}) {
   return /*#__PURE__*/React.createElement("div", {
-    style: _objectSpread({
+    style: {
       width: '100%',
       height: '100%',
       background: 'repeating-linear-gradient(-45deg,#EFEFEF 0 12px,#E6E6E6 12px 24px)',
@@ -32,42 +24,41 @@ function BgPlaceholder(_ref) {
       color: '#bbb',
       fontSize: 13,
       fontFamily: 'ui-monospace,monospace',
-      borderRadius: 8
-    }, style)
+      borderRadius: 8,
+      ...style
+    }
   });
 }
 
 /* ============== Callout — barra base padronizada ============== */
-function Callout(_ref2) {
-  var titleKey = _ref2.titleKey,
-    textKey = _ref2.textKey,
-    data = _ref2.data,
-    set = _ref2.set;
+function Callout({
+  titleKey,
+  textKey,
+  data,
+  set
+}) {
   return /*#__PURE__*/React.createElement("div", {
     className: "callout"
   }, /*#__PURE__*/React.createElement("div", {
     className: "txt"
   }, /*#__PURE__*/React.createElement("b", null, /*#__PURE__*/React.createElement(Ed, {
     value: data[titleKey],
-    onChange: function onChange(v) {
-      return set(titleKey, v);
-    }
+    onChange: v => set(titleKey, v)
   })), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement(Ed, {
     value: data[textKey],
-    onChange: function onChange(v) {
-      return set(textKey, v);
-    }
+    onChange: v => set(textKey, v)
   }))));
 }
 
 /* ZoomedImg substituído por PanZoom (MLPanZoomImg) — suporta pan + zoom */
 
 /* ---- VARIANTE A: 3 círculos (atual) ---- */
-function Photo1A(_ref3) {
-  var data = _ref3.data,
-    set = _ref3.set,
-    bgMode = _ref3.bgMode;
-  var circles = data.p1_circles || [];
+function Photo1A({
+  data,
+  set,
+  bgMode
+}) {
+  const circles = data.p1_circles || [];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       width: '100%',
@@ -92,36 +83,34 @@ function Photo1A(_ref3) {
       position: 'relative',
       zIndex: 6
     }
-  }, circles.map(function (c, i) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        width: 290,
-        height: 290,
-        borderRadius: '50%',
-        border: '7px solid var(--orange,#E89522)',
-        background: '#fff',
-        overflow: 'hidden',
-        display: 'grid',
-        placeItems: 'center',
-        transform: i === 1 ? 'translateY(-30px)' : 'none',
-        boxShadow: '0 8px 22px rgba(0,0,0,.08)',
-        flexShrink: 0
-      }
-    }, c.img ? /*#__PURE__*/React.createElement("img", {
-      src: c.img,
-      alt: "",
-      style: {
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover'
-      }
-    }) : /*#__PURE__*/React.createElement(BgPlaceholder, {
-      style: {
-        borderRadius: '50%'
-      }
-    }));
-  })), /*#__PURE__*/React.createElement(PanZoom, {
+  }, circles.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      width: 290,
+      height: 290,
+      borderRadius: '50%',
+      border: '7px solid var(--orange,#E89522)',
+      background: '#fff',
+      overflow: 'hidden',
+      display: 'grid',
+      placeItems: 'center',
+      transform: i === 1 ? 'translateY(-30px)' : 'none',
+      boxShadow: '0 8px 22px rgba(0,0,0,.08)',
+      flexShrink: 0
+    }
+  }, c.img ? /*#__PURE__*/React.createElement("img", {
+    src: c.img,
+    alt: "",
+    style: {
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover'
+    }
+  }) : /*#__PURE__*/React.createElement(BgPlaceholder, {
+    style: {
+      borderRadius: '50%'
+    }
+  })))), /*#__PURE__*/React.createElement(PanZoom, {
     src: data.p1_img || data.mainImg,
     zoom: data.p1_zoom || 1,
     panKey: "p1_pan",
@@ -131,57 +120,55 @@ function Photo1A(_ref3) {
 }
 
 /* ---- VARIANTE E: produto grande + 1 círculo de detalhe movível ---- */
-function Photo1E(_ref4) {
-  var data = _ref4.data,
-    set = _ref4.set,
-    bgMode = _ref4.bgMode;
-  var spot = data.p1e_spot || {
+function Photo1E({
+  data,
+  set,
+  bgMode
+}) {
+  const spot = data.p1e_spot || {
     img: '',
     x: 60,
     y: 58,
     size: 340
   };
-  var setSpot = function setSpot(patch) {
-    return set('p1e_spot', _objectSpread(_objectSpread({}, spot), patch));
-  };
-  var fileRef = React.useRef(null);
-  var onFile = function onFile(e) {
-    var _e$target$files;
-    var f = (_e$target$files = e.target.files) === null || _e$target$files === void 0 ? void 0 : _e$target$files[0];
+  const setSpot = patch => set('p1e_spot', {
+    ...spot,
+    ...patch
+  });
+  const fileRef = React.useRef(null);
+  const onFile = e => {
+    const f = e.target.files?.[0];
     if (!f) return;
-    var r = new FileReader();
-    r.onload = function (ev) {
-      return setSpot({
-        img: ev.target.result
-      });
-    };
+    const r = new FileReader();
+    r.onload = ev => setSpot({
+      img: ev.target.result
+    });
     r.readAsDataURL(f);
   };
-  var startDrag = function startDrag(ev) {
+  const startDrag = ev => {
     ev.stopPropagation();
-    var startX = ev.clientX,
+    const startX = ev.clientX,
       startY = ev.clientY;
-    var origX = spot.x,
+    const origX = spot.x,
       origY = spot.y;
-    var onMove = function onMove(e) {
-      var _scaleEl$style$transf;
-      var scaleEl = document.querySelector('.canvas');
-      var scale = parseFloat((scaleEl === null || scaleEl === void 0 || (_scaleEl$style$transf = scaleEl.style.transform) === null || _scaleEl$style$transf === void 0 || (_scaleEl$style$transf = _scaleEl$style$transf.match(/scale\(([^)]+)\)/)) === null || _scaleEl$style$transf === void 0 ? void 0 : _scaleEl$style$transf[1]) || '1');
-      var dx = (e.clientX - startX) / scale;
-      var dy = (e.clientY - startY) / scale;
+    const onMove = e => {
+      const scaleEl = document.querySelector('.canvas');
+      const scale = parseFloat(scaleEl?.style.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1');
+      const dx = (e.clientX - startX) / scale;
+      const dy = (e.clientY - startY) / scale;
       setSpot({
         x: Math.max(0, Math.min(85, origX + dx / 1200 * 100)),
         y: Math.max(0, Math.min(85, origY + dy / 1540 * 100))
       });
     };
-    var _onUp = function onUp() {
+    const onUp = () => {
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', _onUp);
+      window.removeEventListener('mouseup', onUp);
     };
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', _onUp);
+    window.addEventListener('mouseup', onUp);
   };
-  var sz = spot.size || 340;
+  const sz = spot.size || 340;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       width: '100%',
@@ -208,8 +195,8 @@ function Photo1E(_ref4) {
     onMouseDown: startDrag,
     style: {
       position: 'absolute',
-      left: "".concat(spot.x, "%"),
-      top: "".concat(spot.y, "%"),
+      left: `${spot.x}%`,
+      top: `${spot.y}%`,
       width: sz,
       height: sz,
       borderRadius: '50%',
@@ -234,9 +221,7 @@ function Photo1E(_ref4) {
       borderRadius: '50%'
     }
   }), /*#__PURE__*/React.createElement("div", {
-    onMouseDown: function onMouseDown(e) {
-      return e.stopPropagation();
-    },
+    onMouseDown: e => e.stopPropagation(),
     style: {
       position: 'absolute',
       bottom: 0,
@@ -249,7 +234,7 @@ function Photo1E(_ref4) {
       padding: '10px 0'
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: function onClick(e) {
+    onClick: e => {
       e.stopPropagation();
       setSpot({
         size: Math.max(180, sz - 40)
@@ -269,10 +254,9 @@ function Photo1E(_ref4) {
       placeItems: 'center'
     }
   }, "\u2212"), /*#__PURE__*/React.createElement("button", {
-    onClick: function onClick(e) {
-      var _fileRef$current;
+    onClick: e => {
       e.stopPropagation();
-      (_fileRef$current = fileRef.current) === null || _fileRef$current === void 0 || _fileRef$current.click();
+      fileRef.current?.click();
     },
     style: {
       width: 44,
@@ -287,7 +271,7 @@ function Photo1E(_ref4) {
       placeItems: 'center'
     }
   }, "\uD83D\uDCF7"), /*#__PURE__*/React.createElement("button", {
-    onClick: function onClick(e) {
+    onClick: e => {
       e.stopPropagation();
       setSpot({
         size: Math.min(600, sz + 40)
@@ -318,10 +302,11 @@ function Photo1E(_ref4) {
 }
 
 /* ---- VARIANTE C: só o produto, sem nada sobreposto ---- */
-function Photo1C(_ref5) {
-  var data = _ref5.data,
-    set = _ref5.set,
-    bgMode = _ref5.bgMode;
+function Photo1C({
+  data,
+  set,
+  bgMode
+}) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       width: '100%',
@@ -339,11 +324,12 @@ function Photo1C(_ref5) {
 }
 
 /* ---- Dispatcher: escolhe a variante certa ---- */
-function Photo1(_ref6) {
-  var data = _ref6.data,
-    set = _ref6.set,
-    bgMode = _ref6.bgMode;
-  var v = data.p1_variant || 'A';
+function Photo1({
+  data,
+  set,
+  bgMode
+}) {
+  const v = data.p1_variant || 'A';
   if (v === 'E') return /*#__PURE__*/React.createElement(Photo1E, {
     data: data,
     set: set,
@@ -362,10 +348,11 @@ function Photo1(_ref6) {
 }
 
 /* ============== Photo 2: Características principais ============== */
-function Photo2(_ref7) {
-  var data = _ref7.data,
-    set = _ref7.set,
-    bgMode = _ref7.bgMode;
+function Photo2({
+  data,
+  set,
+  bgMode
+}) {
   return /*#__PURE__*/React.createElement("div", {
     className: "tpl",
     style: {
@@ -395,12 +382,8 @@ function Photo2(_ref7) {
     set: set,
     title: data.p2_f1_title,
     text: data.p2_f1_text,
-    onTitle: function onTitle(v) {
-      return set('p2_f1_title', v);
-    },
-    onText: function onText(v) {
-      return set('p2_f1_text', v);
-    }
+    onTitle: v => set('p2_f1_title', v),
+    onText: v => set('p2_f1_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p2_f2",
     data: data,
@@ -420,12 +403,8 @@ function Photo2(_ref7) {
     set: set,
     title: data.p2_f2_title,
     text: data.p2_f2_text,
-    onTitle: function onTitle(v) {
-      return set('p2_f2_title', v);
-    },
-    onText: function onText(v) {
-      return set('p2_f2_text', v);
-    }
+    onTitle: v => set('p2_f2_title', v),
+    onText: v => set('p2_f2_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p2_f3",
     data: data,
@@ -444,12 +423,8 @@ function Photo2(_ref7) {
     set: set,
     title: data.p2_f3_title,
     text: data.p2_f3_text,
-    onTitle: function onTitle(v) {
-      return set('p2_f3_title', v);
-    },
-    onText: function onText(v) {
-      return set('p2_f3_text', v);
-    }
+    onTitle: v => set('p2_f3_title', v),
+    onText: v => set('p2_f3_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p2_f4",
     data: data,
@@ -469,12 +444,8 @@ function Photo2(_ref7) {
     set: set,
     title: data.p2_f4_title,
     text: data.p2_f4_text,
-    onTitle: function onTitle(v) {
-      return set('p2_f4_title', v);
-    },
-    onText: function onText(v) {
-      return set('p2_f4_text', v);
-    }
+    onTitle: v => set('p2_f4_title', v),
+    onText: v => set('p2_f4_text', v)
   })), /*#__PURE__*/React.createElement(PanZoom, {
     src: data.p2_img || data.mainImg,
     zoom: data.p2_zoom || 1,
@@ -494,11 +465,11 @@ function Photo2(_ref7) {
     set: set
   }));
 }
-function Arrow(_ref8) {
-  var d = _ref8.d,
-    _ref8$color = _ref8.color,
-    color = _ref8$color === void 0 ? "#1F7A3A" : _ref8$color;
-  var id = 'arr-' + Math.random().toString(36).slice(2, 8);
+function Arrow({
+  d,
+  color = "#1F7A3A"
+}) {
+  const id = 'arr-' + Math.random().toString(36).slice(2, 8);
   return /*#__PURE__*/React.createElement("svg", {
     style: {
       position: 'absolute',
@@ -526,24 +497,24 @@ function Arrow(_ref8) {
     fill: "none",
     stroke: color,
     strokeWidth: "0.5",
-    markerEnd: "url(#".concat(id, ")"),
+    markerEnd: `url(#${id})`,
     vectorEffect: "non-scaling-stroke",
     style: {
       strokeWidth: 3
     }
   }));
 }
-function Feat(_ref9) {
-  var icon = _ref9.icon,
-    iconKey = _ref9.iconKey,
-    data = _ref9.data,
-    set = _ref9.set,
-    title = _ref9.title,
-    text = _ref9.text,
-    _ref9$align = _ref9.align,
-    align = _ref9$align === void 0 ? "left" : _ref9$align,
-    onTitle = _ref9.onTitle,
-    onText = _ref9.onText;
+function Feat({
+  icon,
+  iconKey,
+  data,
+  set,
+  title,
+  text,
+  align = "left",
+  onTitle,
+  onText
+}) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       maxWidth: 750,
@@ -609,10 +580,11 @@ function Feat(_ref9) {
 }
 
 /* ============== Photo 3: Dimensões / Specs ============== */
-function Photo3(_ref0) {
-  var data = _ref0.data,
-    set = _ref0.set,
-    bgMode = _ref0.bgMode;
+function Photo3({
+  data,
+  set,
+  bgMode
+}) {
   return /*#__PURE__*/React.createElement("div", {
     className: "tpl",
     style: {
@@ -629,27 +601,19 @@ function Photo3(_ref0) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p3_title_a,
-    onChange: function onChange(v) {
-      return set('p3_title_a', v);
-    },
+    onChange: v => set('p3_title_a', v),
     className: "green"
   }), ' ', /*#__PURE__*/React.createElement(Ed, {
     value: data.p3_title_b,
-    onChange: function onChange(v) {
-      return set('p3_title_b', v);
-    }
+    onChange: v => set('p3_title_b', v)
   }), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement(Ed, {
     value: data.p3_title_c,
-    onChange: function onChange(v) {
-      return set('p3_title_c', v);
-    }
+    onChange: v => set('p3_title_c', v)
   }), ' ', /*#__PURE__*/React.createElement("span", {
     className: "pill-yellow-inline"
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p3_title_pill,
-    onChange: function onChange(v) {
-      return set('p3_title_pill', v);
-    }
+    onChange: v => set('p3_title_pill', v)
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'relative',
@@ -674,12 +638,8 @@ function Photo3(_ref0) {
     set: set,
     title: data.p3_f1_title,
     text: data.p3_f1_text,
-    onTitle: function onTitle(v) {
-      return set('p3_f1_title', v);
-    },
-    onText: function onText(v) {
-      return set('p3_f1_text', v);
-    }
+    onTitle: v => set('p3_f1_title', v),
+    onText: v => set('p3_f1_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p3_f2",
     data: data,
@@ -698,12 +658,8 @@ function Photo3(_ref0) {
     set: set,
     title: data.p3_f2_title,
     text: data.p3_f2_text,
-    onTitle: function onTitle(v) {
-      return set('p3_f2_title', v);
-    },
-    onText: function onText(v) {
-      return set('p3_f2_text', v);
-    }
+    onTitle: v => set('p3_f2_title', v),
+    onText: v => set('p3_f2_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p3_f3",
     data: data,
@@ -722,12 +678,8 @@ function Photo3(_ref0) {
     set: set,
     title: data.p3_f3_title,
     text: data.p3_f3_text,
-    onTitle: function onTitle(v) {
-      return set('p3_f3_title', v);
-    },
-    onText: function onText(v) {
-      return set('p3_f3_text', v);
-    }
+    onTitle: v => set('p3_f3_title', v),
+    onText: v => set('p3_f3_text', v)
   })), /*#__PURE__*/React.createElement(Drag, {
     id: "p3_f4",
     data: data,
@@ -746,12 +698,8 @@ function Photo3(_ref0) {
     set: set,
     title: data.p3_f4_title,
     text: data.p3_f4_text,
-    onTitle: function onTitle(v) {
-      return set('p3_f4_title', v);
-    },
-    onText: function onText(v) {
-      return set('p3_f4_text', v);
-    }
+    onTitle: v => set('p3_f4_title', v),
+    onText: v => set('p3_f4_text', v)
   })), /*#__PURE__*/React.createElement(PanZoom, {
     src: data.p3_img || data.mainImg,
     zoom: data.p3_zoom || 1,
@@ -769,12 +717,13 @@ function Photo3(_ref0) {
     set: set
   }));
 }
-function DimLabel(_ref1) {
-  var value = _ref1.value,
-    onChange = _ref1.onChange,
-    style = _ref1.style;
+function DimLabel({
+  value,
+  onChange,
+  style
+}) {
   return /*#__PURE__*/React.createElement("div", {
-    style: _objectSpread({
+    style: {
       position: 'absolute',
       background: '#fff',
       border: '3px solid #1A1A1A',
@@ -783,8 +732,9 @@ function DimLabel(_ref1) {
       fontFamily: 'Montserrat',
       fontWeight: 800,
       fontSize: 24,
-      whiteSpace: 'nowrap'
-    }, style)
+      whiteSpace: 'nowrap',
+      ...style
+    }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: value,
     onChange: onChange
@@ -792,10 +742,11 @@ function DimLabel(_ref1) {
 }
 
 /* ============== Photo 4: Solução ideal ============== */
-function Photo4(_ref10) {
-  var data = _ref10.data,
-    set = _ref10.set,
-    bgMode = _ref10.bgMode;
+function Photo4({
+  data,
+  set,
+  bgMode
+}) {
   return /*#__PURE__*/React.createElement("div", {
     className: "tpl",
     style: {
@@ -814,27 +765,19 @@ function Photo4(_ref10) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_title_a,
-    onChange: function onChange(v) {
-      return set('p4_title_a', v);
-    }
+    onChange: v => set('p4_title_a', v)
   }), ' ', /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_title_b,
-    onChange: function onChange(v) {
-      return set('p4_title_b', v);
-    },
+    onChange: v => set('p4_title_b', v),
     className: "green"
   }), ' ', /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_title_c,
-    onChange: function onChange(v) {
-      return set('p4_title_c', v);
-    }
+    onChange: v => set('p4_title_c', v)
   }), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
     className: "pill-yellow-inline"
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_title_pill,
-    onChange: function onChange(v) {
-      return set('p4_title_pill', v);
-    }
+    onChange: v => set('p4_title_pill', v)
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -877,9 +820,7 @@ function Photo4(_ref10) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_b1_title,
-    onChange: function onChange(v) {
-      return set('p4_b1_title', v);
-    },
+    onChange: v => set('p4_b1_title', v),
     style: {
       fontFamily: 'Montserrat',
       fontSize: 32,
@@ -891,9 +832,7 @@ function Photo4(_ref10) {
     }
   }), /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_b1_text,
-    onChange: function onChange(v) {
-      return set('p4_b1_text', v);
-    },
+    onChange: v => set('p4_b1_text', v),
     multi: true,
     style: {
       fontSize: 24,
@@ -924,9 +863,7 @@ function Photo4(_ref10) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_b2_title,
-    onChange: function onChange(v) {
-      return set('p4_b2_title', v);
-    },
+    onChange: v => set('p4_b2_title', v),
     style: {
       fontFamily: 'Montserrat',
       fontSize: 32,
@@ -938,9 +875,7 @@ function Photo4(_ref10) {
     }
   }), /*#__PURE__*/React.createElement(Ed, {
     value: data.p4_b2_text,
-    onChange: function onChange(v) {
-      return set('p4_b2_text', v);
-    },
+    onChange: v => set('p4_b2_text', v),
     multi: true,
     style: {
       fontSize: 24,
@@ -959,10 +894,11 @@ function Photo4(_ref10) {
 }
 
 /* ============== Photo 5: Garantia + Credibilidade — IDÊNTICA ao original ============== */
-function Photo5(_ref11) {
-  var data = _ref11.data,
-    set = _ref11.set,
-    bgMode = _ref11.bgMode;
+function Photo5({
+  data,
+  set,
+  bgMode
+}) {
   if (bgMode) {
     // Apenas miniatura do produto sobre o fundo fixo — arrastrável
     return /*#__PURE__*/React.createElement("div", {
@@ -1022,41 +958,23 @@ function Photo5(_ref11) {
     textA: data.p5_t1_text_a,
     hl: data.p5_t1_hl,
     textB: data.p5_t1_text_b,
-    onA: function onA(v) {
-      return set('p5_t1_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p5_t1_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p5_t1_text_b', v);
-    }
+    onA: v => set('p5_t1_text_a', v),
+    onHl: v => set('p5_t1_hl', v),
+    onB: v => set('p5_t1_text_b', v)
   }), /*#__PURE__*/React.createElement(TrustRow, {
     textA: data.p5_t2_text_a,
     hl: data.p5_t2_hl,
     textB: data.p5_t2_text_b,
-    onA: function onA(v) {
-      return set('p5_t2_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p5_t2_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p5_t2_text_b', v);
-    }
+    onA: v => set('p5_t2_text_a', v),
+    onHl: v => set('p5_t2_hl', v),
+    onB: v => set('p5_t2_text_b', v)
   }), /*#__PURE__*/React.createElement(TrustRow, {
     textA: data.p5_t3_text_a,
     hl: data.p5_t3_hl,
     textB: data.p5_t3_text_b,
-    onA: function onA(v) {
-      return set('p5_t3_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p5_t3_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p5_t3_text_b', v);
-    }
+    onA: v => set('p5_t3_text_a', v),
+    onHl: v => set('p5_t3_hl', v),
+    onB: v => set('p5_t3_text_b', v)
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -1140,9 +1058,7 @@ function Photo5(_ref11) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p5_store_name,
-    onChange: function onChange(v) {
-      return set('p5_store_name', v);
-    },
+    onChange: v => set('p5_store_name', v),
     style: {
       fontFamily: 'Montserrat',
       fontSize: 28,
@@ -1152,9 +1068,7 @@ function Photo5(_ref11) {
     }
   }), /*#__PURE__*/React.createElement(Ed, {
     value: data.p5_store_sub,
-    onChange: function onChange(v) {
-      return set('p5_store_sub', v);
-    },
+    onChange: v => set('p5_store_sub', v),
     style: {
       fontSize: 16,
       color: '#4A4A4A',
@@ -1176,9 +1090,7 @@ function Photo5(_ref11) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p5_badge,
-    onChange: function onChange(v) {
-      return set('p5_badge', v);
-    }
+    onChange: v => set('p5_badge', v)
   }), ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: '#1F7A3A',
@@ -1186,24 +1098,20 @@ function Photo5(_ref11) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p5_rating,
-    onChange: function onChange(v) {
-      return set('p5_rating', v);
-    }
+    onChange: v => set('p5_rating', v)
   })), ' de 5'), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 2
     }
-  }, [1, 2, 3, 4, 5].map(function (i) {
-    return /*#__PURE__*/React.createElement("span", {
-      key: i,
-      style: {
-        color: '#FFC42B',
-        fontSize: 26,
-        lineHeight: 1
-      }
-    }, "\u2605");
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, [1, 2, 3, 4, 5].map(i => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    style: {
+      color: '#FFC42B',
+      fontSize: 26,
+      lineHeight: 1
+    }
+  }, "\u2605")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr 1fr',
@@ -1213,34 +1121,27 @@ function Photo5(_ref11) {
   }, /*#__PURE__*/React.createElement(Stat, {
     value: data.p5_stat1_v,
     label: data.p5_stat1_l,
-    onV: function onV(v) {
-      return set('p5_stat1_v', v);
-    },
-    onL: function onL(v) {
-      return set('p5_stat1_l', v);
-    },
+    onV: v => set('p5_stat1_v', v),
+    onL: v => set('p5_stat1_l', v),
     big: true
   }), /*#__PURE__*/React.createElement(Stat, {
     icon: /*#__PURE__*/React.createElement(Ic.chat, null),
     label: data.p5_stat2_l,
-    onL: function onL(v) {
-      return set('p5_stat2_l', v);
-    }
+    onL: v => set('p5_stat2_l', v)
   }), /*#__PURE__*/React.createElement(Stat, {
     icon: /*#__PURE__*/React.createElement(Ic.clock, null),
     label: data.p5_stat3_l,
-    onL: function onL(v) {
-      return set('p5_stat3_l', v);
-    }
+    onL: v => set('p5_stat3_l', v)
   }))));
 }
-function TrustRow(_ref12) {
-  var textA = _ref12.textA,
-    hl = _ref12.hl,
-    textB = _ref12.textB,
-    onA = _ref12.onA,
-    onHl = _ref12.onHl,
-    onB = _ref12.onB;
+function TrustRow({
+  textA,
+  hl,
+  textB,
+  onA,
+  onHl,
+  onB
+}) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -1287,13 +1188,14 @@ function TrustRow(_ref12) {
     }
   })));
 }
-function Stat(_ref13) {
-  var icon = _ref13.icon,
-    value = _ref13.value,
-    label = _ref13.label,
-    onV = _ref13.onV,
-    onL = _ref13.onL,
-    big = _ref13.big;
+function Stat({
+  icon,
+  value,
+  label,
+  onV,
+  onL,
+  big
+}) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -1360,10 +1262,11 @@ window.MLPhoto2 = Photo2;
 window.MLPhoto3 = Photo3;
 window.MLPhoto4 = Photo4;
 window.MLPhoto5 = Photo5;
-function Photo6(_ref14) {
-  var data = _ref14.data,
-    set = _ref14.set,
-    bgMode = _ref14.bgMode;
+function Photo6({
+  data,
+  set,
+  bgMode
+}) {
   if (bgMode) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1422,41 +1325,23 @@ function Photo6(_ref14) {
     textA: data.p6_t1_text_a,
     hl: data.p6_t1_hl,
     textB: data.p6_t1_text_b,
-    onA: function onA(v) {
-      return set('p6_t1_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p6_t1_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p6_t1_text_b', v);
-    }
+    onA: v => set('p6_t1_text_a', v),
+    onHl: v => set('p6_t1_hl', v),
+    onB: v => set('p6_t1_text_b', v)
   }), /*#__PURE__*/React.createElement(TrustRow, {
     textA: data.p6_t2_text_a,
     hl: data.p6_t2_hl,
     textB: data.p6_t2_text_b,
-    onA: function onA(v) {
-      return set('p6_t2_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p6_t2_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p6_t2_text_b', v);
-    }
+    onA: v => set('p6_t2_text_a', v),
+    onHl: v => set('p6_t2_hl', v),
+    onB: v => set('p6_t2_text_b', v)
   }), /*#__PURE__*/React.createElement(TrustRow, {
     textA: data.p6_t3_text_a,
     hl: data.p6_t3_hl,
     textB: data.p6_t3_text_b,
-    onA: function onA(v) {
-      return set('p6_t3_text_a', v);
-    },
-    onHl: function onHl(v) {
-      return set('p6_t3_hl', v);
-    },
-    onB: function onB(v) {
-      return set('p6_t3_text_b', v);
-    }
+    onA: v => set('p6_t3_text_a', v),
+    onHl: v => set('p6_t3_hl', v),
+    onB: v => set('p6_t3_text_b', v)
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -1540,9 +1425,7 @@ function Photo6(_ref14) {
     }
   }, /*#__PURE__*/React.createElement(Ed, {
     value: data.p6_store_name,
-    onChange: function onChange(v) {
-      return set('p6_store_name', v);
-    },
+    onChange: v => set('p6_store_name', v),
     style: {
       fontFamily: 'Montserrat',
       fontSize: 28,
@@ -1552,9 +1435,7 @@ function Photo6(_ref14) {
     }
   }), /*#__PURE__*/React.createElement(Ed, {
     value: data.p6_store_sub,
-    onChange: function onChange(v) {
-      return set('p6_store_sub', v);
-    },
+    onChange: v => set('p6_store_sub', v),
     style: {
       fontSize: 16,
       color: '#4A4A4A',
@@ -1576,9 +1457,7 @@ function Photo6(_ref14) {
     }
   }), /*#__PURE__*/React.createElement(Ed, {
     value: data.p6_badge,
-    onChange: function onChange(v) {
-      return set('p6_badge', v);
-    },
+    onChange: v => set('p6_badge', v),
     style: {
       fontSize: 18,
       fontWeight: 700,
@@ -1590,18 +1469,16 @@ function Photo6(_ref14) {
       gap: 5,
       marginBottom: 18
     }
-  }, ['#FF4D4F', '#FF9F43', '#FFD93D', '#A0E548', '#1F7A3A'].map(function (c, i) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        flex: 1,
-        height: 7,
-        borderRadius: 4,
-        background: c,
-        opacity: i === 4 ? 1 : 0.3
-      }
-    });
-  })), /*#__PURE__*/React.createElement("div", {
+  }, ['#FF4D4F', '#FF9F43', '#FFD93D', '#A0E548', '#1F7A3A'].map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      flex: 1,
+      height: 7,
+      borderRadius: 4,
+      background: c,
+      opacity: i === 4 ? 1 : 0.3
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr 1fr',
@@ -1611,25 +1488,17 @@ function Photo6(_ref14) {
   }, /*#__PURE__*/React.createElement(Stat, {
     value: data.p6_stat1_v,
     label: data.p6_stat1_l,
-    onV: function onV(v) {
-      return set('p6_stat1_v', v);
-    },
-    onL: function onL(v) {
-      return set('p6_stat1_l', v);
-    },
+    onV: v => set('p6_stat1_v', v),
+    onL: v => set('p6_stat1_l', v),
     big: true
   }), /*#__PURE__*/React.createElement(Stat, {
     icon: /*#__PURE__*/React.createElement(Ic.chat, null),
     label: data.p6_stat2_l,
-    onL: function onL(v) {
-      return set('p6_stat2_l', v);
-    }
+    onL: v => set('p6_stat2_l', v)
   }), /*#__PURE__*/React.createElement(Stat, {
     icon: /*#__PURE__*/React.createElement(Ic.clock, null),
     label: data.p6_stat3_l,
-    onL: function onL(v) {
-      return set('p6_stat3_l', v);
-    }
+    onL: v => set('p6_stat3_l', v)
   }))));
 }
 window.MLPhoto6 = Photo6;
