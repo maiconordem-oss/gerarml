@@ -3292,7 +3292,3 @@ function App() {
   }));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
-
-// Remove o loader assim que o React montar
-const _loader = document.getElementById('app-loader');
-if (_loader) { _loader.style.opacity = '0'; setTimeout(() => _loader.remove(), 320); }
