@@ -268,18 +268,18 @@ function TextFormatPanel() {
       ref={panelRef}
       tabIndex={-1}
       style={{
-        position: 'absolute',
-        right: -68, top: 0, bottom: 0,
-        width: 60,
+        width: 64,
+        height: '100%',
+        minHeight: 200,
         background: '#1a1a1a',
-        borderRadius: '0 10px 10px 0',
+        borderRadius: '0 8px 8px 0',
         display: 'flex', flexDirection: 'column',
         padding: '8px 6px',
         gap: 2,
-        boxShadow: '4px 0 16px rgba(0,0,0,.25)',
-        zIndex: 200,
+        boxShadow: '3px 0 12px rgba(0,0,0,.2)',
         overflowY: 'auto',
         overflowX: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
       <Label>Estilo</Label>

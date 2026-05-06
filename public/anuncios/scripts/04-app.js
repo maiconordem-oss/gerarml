@@ -325,13 +325,11 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
     return () => ro.disconnect();
   }, []);
 
-  // Escuta foco de texto — só mostra painel se o texto estiver dentro deste slot
+  // Escuta foco de texto — só ativa se o texto estiver neste canvas
   useEffect(() => {
     const handler = (e) => {
       if (!e.detail) { setTextActive(false); return; }
-      // Verificar se o elemento focado está dentro deste canvas
-      const el = e.detail.el;
-      if (canvasRef.current && canvasRef.current.contains(el)) {
+      if (canvasRef.current && canvasRef.current.contains(e.detail.el)) {
         setTextActive(true);
       } else {
         setTextActive(false);
@@ -356,52 +354,60 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
         </div>
       </div>
       {extra && <div style={{marginBottom:6}}>{extra}</div>}
-      <div className="canvas-wrap" ref={wrapRef}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{ position: 'relative' }}
-      >
-        {/* Toolbar de imagem — aparece no hover */}
-        {imgToolbar && (
-          <div
-            data-export-hide="true"
-            style={{
-              position: 'absolute', top: 8, left: 8, right: 8,
-              zIndex: 100,
-              opacity: hovered && !textActive ? 1 : 0,
-              transform: hovered && !textActive ? 'translateY(0)' : 'translateY(-6px)',
-              transition: 'opacity .18s ease, transform .18s ease',
-              pointerEvents: hovered && !textActive ? 'auto' : 'none',
-            }}
-          >
-            {imgToolbar}
-          </div>
-        )}
 
-        {/* Painel de formatação de texto — lateral direita, fora do canvas escalado */}
-        <div data-export-hide="true" style={{
-          position: 'absolute',
-          right: 0, top: 0, bottom: 0,
-          width: textActive ? 66 : 0,
-          overflow: 'hidden',
-          transition: 'width .2s ease',
-          zIndex: 150,
-          pointerEvents: textActive ? 'auto' : 'none',
-        }}>
+      {/* Layout lado a lado: foto + painel de texto */}
+      <div style={{ display: 'flex', gap: 0, alignItems: 'stretch' }}>
+
+        {/* Canvas wrap */}
+        <div className="canvas-wrap" ref={wrapRef}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          style={{ position: 'relative', flex: 1, minWidth: 0 }}
+        >
+          {/* Toolbar de imagem — aparece no hover, some quando texto ativo */}
+          {imgToolbar && (
+            <div
+              data-export-hide="true"
+              style={{
+                position: 'absolute', top: 8, left: 8, right: 8,
+                zIndex: 100,
+                opacity: hovered && !textActive ? 1 : 0,
+                transform: hovered && !textActive ? 'translateY(0)' : 'translateY(-6px)',
+                transition: 'opacity .18s ease, transform .18s ease',
+                pointerEvents: hovered && !textActive ? 'auto' : 'none',
+              }}
+            >
+              {imgToolbar}
+            </div>
+          )}
+
+          <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
+            {bg && (
+              <img src={bg} alt="" style={{
+                position:'absolute', inset:0, width:'100%', height:'100%',
+                objectFit:'cover', zIndex:0, pointerEvents:'none'
+              }}/>
+            )}
+            <div style={{position:'relative', zIndex:1, width:'100%', height:'100%'}}>
+              {children}
+            </div>
+          </div>
+        </div>
+
+        {/* Painel de formatação — lateral direita, fora do canvas, no tamanho real */}
+        <div
+          data-export-hide="true"
+          style={{
+            width: textActive ? 64 : 0,
+            minHeight: 200,
+            overflow: 'hidden',
+            transition: 'width .2s ease',
+            flexShrink: 0,
+          }}
+        >
           {textActive && <window.MLTextFormatPanel />}
         </div>
 
-        <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
-          {bg && (
-            <img src={bg} alt="" style={{
-              position:'absolute', inset:0, width:'100%', height:'100%',
-              objectFit:'cover', zIndex:0, pointerEvents:'none'
-            }}/>
-          )}
-          <div style={{position:'relative', zIndex:1, width:'100%', height:'100%'}}>
-            {children}
-          </div>
-        </div>
       </div>
     </div>
   );
