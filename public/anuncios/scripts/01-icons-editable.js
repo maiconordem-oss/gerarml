@@ -324,6 +324,9 @@ function Draggable({ id, data, set, children, defaultPos={x:0,y:0}, enabled, sty
   const ref = useRef(null);
   const [guides, setGuides] = useState({ h:null, v:null });
 
+  // Ativo se: bgMode/enabled passado OU modo mover global
+  const isEnabled = enabled || !!(data && data.__moveMode);
+
   const getCanvasScale = () => {
     let el = ref.current;
     while (el && !(el.classList && el.classList.contains('canvas'))) el = el.parentElement;
@@ -332,8 +335,10 @@ function Draggable({ id, data, set, children, defaultPos={x:0,y:0}, enabled, sty
   };
 
   const onMouseDown = (e) => {
-    if (!enabled) return;
-    e.preventDefault(); e.stopPropagation();
+    if (!isEnabled) return;
+    // Se está em modo mover, impede que o clique propague para o texto
+    if (data && data.__moveMode) e.preventDefault();
+    e.stopPropagation();
     const startX=e.clientX, startY=e.clientY, startPos={...pos};
     const scale = getCanvasScale();
     const onMove = (ev) => {
@@ -352,16 +357,16 @@ function Draggable({ id, data, set, children, defaultPos={x:0,y:0}, enabled, sty
   const wrapperStyle = {
     ...style,
     transform: 'translate('+pos.x+'px,'+pos.y+'px)'+(style && style.transform ? ' '+style.transform : ''),
-    cursor: enabled ? 'move' : undefined,
-    outline: enabled ? '2px dashed rgba(31,122,58,.5)' : 'none',
-    outlineOffset: enabled ? 4 : 0,
+    cursor: isEnabled ? 'move' : undefined,
+    outline: isEnabled ? '2px dashed rgba(245,158,11,.6)' : 'none',
+    outlineOffset: isEnabled ? 4 : 0,
   };
 
   return (
     <React.Fragment>
-      {enabled && guides.h !== null && <div data-export-hide="true" style={{ position:'absolute', top:guides.h+'%', left:0, right:0, height:2, background:'#ef4444', opacity:.8, zIndex:999, pointerEvents:'none' }}/>}
-      {enabled && guides.v !== null && <div data-export-hide="true" style={{ position:'absolute', left:guides.v+'%', top:0, bottom:0, width:2, background:'#ef4444', opacity:.8, zIndex:999, pointerEvents:'none' }}/>}
-      <div ref={ref} style={wrapperStyle} onMouseDown={onMouseDown} data-edit-outline={enabled ? 'true' : undefined}>
+      {isEnabled && guides.h !== null && <div data-export-hide="true" style={{ position:'absolute', top:guides.h+'%', left:0, right:0, height:2, background:'#ef4444', opacity:.8, zIndex:999, pointerEvents:'none' }}/>}
+      {isEnabled && guides.v !== null && <div data-export-hide="true" style={{ position:'absolute', left:guides.v+'%', top:0, bottom:0, width:2, background:'#ef4444', opacity:.8, zIndex:999, pointerEvents:'none' }}/>}
+      <div ref={ref} style={wrapperStyle} onMouseDown={onMouseDown}>
         {children}
       </div>
     </React.Fragment>
