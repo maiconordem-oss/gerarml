@@ -88,7 +88,7 @@ function Photo1E({ data, set, bgMode }) {
     <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', overflow: 'hidden' }}>
       {/* Produto */}
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60 }}>
-        <PanZoom src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} </>
+        <PanZoom src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set}/>
       </div>
 
       {/* Círculo único movível */}
@@ -359,11 +359,7 @@ function Photo5({ data, set, bgMode }) {
     // Apenas miniatura do produto sobre o fundo fixo — arrastrável
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-        <Drag id="p5_mini" data={data} set={set} enabled
-          defaultPos={{ x: 750, y: 700 }}
-          style={{ position: 'absolute', top: 0, left: 0, width: data.p5_mini_size || 280, height: data.p5_mini_size || 280, display: 'grid', placeItems: 'center' }}>
-          <PanZoom src={data.p5_img||data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set} </>
-        </Drag>
+        <PanZoom src={data.p5_img||data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set}/>
       </div>
     );
   }
@@ -512,11 +508,7 @@ function Photo6({ data, set, bgMode }) {
   if (bgMode) {
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-        <Drag id="p6_mini" data={data} set={set} enabled
-          defaultPos={{ x: 750, y: 700 }}
-          style={{ position: 'absolute', top: 0, left: 0, width: data.p6_mini_size || 280, height: data.p6_mini_size || 280, display: 'grid', placeItems: 'center' }}>
-          <PanZoom src={data.p6_img||data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set} </>
-        </Drag>
+        <PanZoom src={data.p6_img||data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set}/>
       </div>
     );
   }
