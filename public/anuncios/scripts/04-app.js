@@ -305,12 +305,13 @@ function makeCircleCrops(dataUrl) {
   });
 }
 
-/* ============== Slot wrapper with scaling + floating toolbar ============== */
+/* ============== Slot wrapper with scaling + floating toolbars ============== */
 function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const [scale, setScale] = useState(0.4);
   const [hovered, setHovered] = useState(false);
+  const [textActive, setTextActive] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -322,6 +323,22 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
     const ro = new ResizeObserver(update);
     if (wrapRef.current) ro.observe(wrapRef.current);
     return () => ro.disconnect();
+  }, []);
+
+  // Escuta foco de texto — só mostra painel se o texto estiver dentro deste slot
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.detail) { setTextActive(false); return; }
+      // Verificar se o elemento focado está dentro deste canvas
+      const el = e.detail.el;
+      if (canvasRef.current && canvasRef.current.contains(el)) {
+        setTextActive(true);
+      } else {
+        setTextActive(false);
+      }
+    };
+    window.addEventListener('ml-text-focus', handler);
+    return () => window.removeEventListener('ml-text-focus', handler);
   }, []);
 
   const handleExport = async () => {
@@ -344,22 +361,36 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
         onMouseLeave={() => setHovered(false)}
         style={{ position: 'relative' }}
       >
-        {/* Toolbar flutuante sobre a foto */}
+        {/* Toolbar de imagem — aparece no hover */}
         {imgToolbar && (
           <div
             data-export-hide="true"
             style={{
               position: 'absolute', top: 8, left: 8, right: 8,
               zIndex: 100,
-              opacity: hovered ? 1 : 0,
-              transform: hovered ? 'translateY(0)' : 'translateY(-6px)',
+              opacity: hovered && !textActive ? 1 : 0,
+              transform: hovered && !textActive ? 'translateY(0)' : 'translateY(-6px)',
               transition: 'opacity .18s ease, transform .18s ease',
-              pointerEvents: hovered ? 'auto' : 'none',
+              pointerEvents: hovered && !textActive ? 'auto' : 'none',
             }}
           >
             {imgToolbar}
           </div>
         )}
+
+        {/* Painel de formatação de texto — lateral direita, fora do canvas escalado */}
+        <div data-export-hide="true" style={{
+          position: 'absolute',
+          right: 0, top: 0, bottom: 0,
+          width: textActive ? 66 : 0,
+          overflow: 'hidden',
+          transition: 'width .2s ease',
+          zIndex: 150,
+          pointerEvents: textActive ? 'auto' : 'none',
+        }}>
+          {textActive && <window.MLTextFormatPanel />}
+        </div>
+
         <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
           {bg && (
             <img src={bg} alt="" style={{

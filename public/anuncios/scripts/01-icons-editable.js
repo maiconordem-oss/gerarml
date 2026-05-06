@@ -42,52 +42,45 @@ function CurvedArrow({ from, to, curve = 0.3, color = "#1F7A3A" }) {
   );
 }
 
-/* =============== EDITABLE TEXT — com toolbar de formatação =============== */
+/* =============== EDITABLE TEXT ===============
+   Ao focar, emite evento global 'ml-text-focus' com ref e callbacks.
+   O TextFormatPanel (fora do canvas escalado) escuta e mostra os controles.
+*/
 function E({ value, onChange, className, style, multi }) {
   const Tag = multi ? 'div' : 'span';
   const ref = useRef(null);
-  const toolbarRef = useRef(null);
-  const [focused, setFocused] = useState(false);
-  const [charCount, setCharCount] = useState((value||'').length);
-  const [currentSize, setCurrentSize] = useState(null); // tamanho detectado ao focar
   const prevValue = useRef(value);
-  const savedRange = useRef(null);
+  const [focused, setFocused] = useState(false);
 
-  const saveSelection = () => {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
-  };
-
-  const restoreSelection = () => {
-    if (!savedRange.current) return;
-    const sel = window.getSelection();
-    try { sel.removeAllRanges(); sel.addRange(savedRange.current); } catch(_) {}
-  };
-
-  // Detectar tamanho atual do texto ao focar
-  const detectSize = () => {
-    if (!ref.current) return;
-    const computed = parseFloat(window.getComputedStyle(ref.current).fontSize);
-    const inline = parseFloat(ref.current.style.fontSize);
-    const fromStyle = parseFloat(style && style.fontSize);
-    setCurrentSize(Math.round(inline || computed || fromStyle || 32));
+  const emit = (active) => {
+    window.dispatchEvent(new CustomEvent('ml-text-focus', {
+      detail: active ? {
+        el: ref.current,
+        style,
+        onSave: (html) => onChange(html),
+        onCancel: () => { if (ref.current) ref.current.innerHTML = prevValue.current; },
+      } : null
+    }));
   };
 
   const handleFocus = () => {
     prevValue.current = ref.current ? ref.current.innerHTML : value;
     setFocused(true);
-    setCharCount((ref.current ? ref.current.innerText : '').length);
-    detectSize();
+    emit(true);
   };
 
-  const handleInput = () => {
-    setCharCount((ref.current ? ref.current.innerText : '').length);
-    saveSelection();
+  const handleBlur = (e) => {
+    // Checar se foco foi pro painel lateral (tem data-fmt-panel)
+    const related = e.relatedTarget;
+    if (related && (related.closest && related.closest('[data-fmt-panel]'))) return;
+    setFocused(false);
+    if (ref.current) onChange(ref.current.innerHTML);
+    emit(false);
   };
 
   const handleKeyDown = (e) => {
-    if ((e.ctrlKey||e.metaKey) && e.key === 'b') { e.preventDefault(); e.stopPropagation(); document.execCommand('bold'); }
-    if ((e.ctrlKey||e.metaKey) && e.key === 'i') { e.preventDefault(); e.stopPropagation(); document.execCommand('italic'); }
+    if ((e.ctrlKey||e.metaKey) && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
+    if ((e.ctrlKey||e.metaKey) && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
     if (e.key === 'Escape') {
       if (ref.current) ref.current.innerHTML = prevValue.current;
       ref.current && ref.current.blur();
@@ -96,185 +89,296 @@ function E({ value, onChange, className, style, multi }) {
     if (e.key === 'Enter' && !multi) { ref.current && ref.current.blur(); e.preventDefault(); }
   };
 
-  const handleBlur = (e) => {
-    if (toolbarRef.current && toolbarRef.current.contains(e.relatedTarget)) return;
-    setFocused(false);
-    if (ref.current) onChange(ref.current.innerHTML);
+  return (
+    <Tag
+      ref={ref}
+      className={className}
+      style={{
+        ...style,
+        outline: focused ? '2px solid #3b82f6' : 'none',
+        outlineOffset: focused ? 3 : 0,
+        borderRadius: focused ? 4 : 0,
+        transition: 'outline .1s',
+        cursor: 'text',
+      }}
+      contentEditable
+      suppressContentEditableWarning
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      onMouseUp={() => emit(true)}
+      dangerouslySetInnerHTML={{ __html: (value||'').replace(/\n/g,'<br/>') }}
+    />
+  );
+}
+
+/* =============== TEXT FORMAT PANEL — painel lateral fixo ===============
+   Fica fora do canvas escalado, na lateral direita do slot.
+   Escuta 'ml-text-focus' e mostra controles quando texto está ativo.
+*/
+function TextFormatPanel() {
+  const panelRef = useRef(null);
+  const [active, setActive] = useState(null); // { el, style, onSave, onCancel }
+  const [size, setSize] = useState(32);
+  const [sizeInput, setSizeInput] = useState('32');
+  const [color, setColor] = useState('#000000');
+  const [charCount, setCharCount] = useState(0);
+  const savedRange = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.detail) {
+        setActive(null);
+        return;
+      }
+      setActive(e.detail);
+      // Detectar tamanho e cor do elemento
+      const el = e.detail.el;
+      if (el) {
+        const computed = window.getComputedStyle(el);
+        const sz = Math.round(parseFloat(el.style.fontSize) || parseFloat(computed.fontSize) || 32);
+        setSize(sz);
+        setSizeInput(String(sz));
+        setCharCount(el.innerText.length);
+        // Cor — tenta pegar do style inline ou computed
+        const clr = el.style.color || computed.color || '#000000';
+        // Converter rgb() para hex se necessário
+        const m = clr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (m) {
+          const hex = '#' + [m[1],m[2],m[3]].map(n => (+n).toString(16).padStart(2,'0')).join('');
+          setColor(hex);
+        } else if (clr.startsWith('#')) {
+          setColor(clr);
+        }
+      }
+    };
+    window.addEventListener('ml-text-focus', handler);
+    return () => window.removeEventListener('ml-text-focus', handler);
+  }, []);
+
+  // Atualizar contagem ao digitar
+  useEffect(() => {
+    if (!active) return;
+    const el = active.el;
+    if (!el) return;
+    const onInput = () => setCharCount(el.innerText.length);
+    el.addEventListener('input', onInput);
+    return () => el.removeEventListener('input', onInput);
+  }, [active]);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
+  };
+
+  const restoreAndFocus = () => {
+    if (!active) return;
+    active.el.focus();
+    if (savedRange.current) {
+      const sel = window.getSelection();
+      try { sel.removeAllRanges(); sel.addRange(savedRange.current); } catch(_) {}
+    }
   };
 
   const fmt = (cmd, val) => {
-    restoreSelection();
+    restoreAndFocus();
     document.execCommand(cmd, false, val || null);
-    ref.current && ref.current.focus();
+    active.el.focus();
     saveSelection();
   };
 
-  // Aplicar tamanho de fonte — sempre via span envolvendo o conteúdo todo ou seleção
   const applySize = (newSize) => {
-    if (!ref.current) return;
-    const size = Math.max(8, Math.min(200, newSize));
-    setCurrentSize(size);
-
+    if (!active || !active.el) return;
+    const sz = Math.max(8, Math.min(300, newSize));
+    setSize(sz);
+    setSizeInput(String(sz));
+    active.el.focus();
+    if (savedRange.current) {
+      const sel = window.getSelection();
+      try { sel.removeAllRanges(); sel.addRange(savedRange.current); } catch(_) {}
+    }
     const sel = window.getSelection();
-    restoreSelection();
-    const sel2 = window.getSelection();
-
-    // Se não há seleção ou está colapsada: muda o elemento inteiro
-    if (!sel2 || sel2.rangeCount === 0 || sel2.getRangeAt(0).collapsed) {
-      ref.current.style.fontSize = size + 'px';
-      ref.current.focus();
-      onChange(ref.current.innerHTML);
-      return;
+    if (!sel || sel.rangeCount === 0 || sel.getRangeAt(0).collapsed) {
+      // Sem seleção — aplica no elemento inteiro
+      active.el.style.fontSize = sz + 'px';
+      active.onSave(active.el.innerHTML);
+    } else {
+      const range = sel.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = sz + 'px';
+      try { range.surroundContents(span); }
+      catch(_) { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
+      sel.removeAllRanges();
+      active.onSave(active.el.innerHTML);
     }
-
-    // Com seleção: envolve em span com novo tamanho
-    const range = sel2.getRangeAt(0);
-    const span = document.createElement('span');
-    span.style.fontSize = size + 'px';
-    try {
-      range.surroundContents(span);
-    } catch(_) {
-      const frag = range.extractContents();
-      span.appendChild(frag);
-      range.insertNode(span);
-    }
-    sel2.removeAllRanges();
-    ref.current.focus();
-    onChange(ref.current.innerHTML);
+    active.el.focus();
   };
 
-  const stepSize = (delta) => applySize((currentSize || 32) + delta);
+  const applyColor = (hex) => {
+    setColor(hex);
+    restoreAndFocus();
+    document.execCommand('foreColor', false, hex);
+    active.el.focus();
+    saveSelection();
+    active.onSave(active.el.innerHTML);
+  };
 
-  const warnColor = charCount > 80 ? '#dc2626' : charCount > 50 ? '#f59e0b' : '#6b7280';
+  const applyAlign = (align) => {
+    restoreAndFocus();
+    document.execCommand('justify' + align.charAt(0).toUpperCase() + align.slice(1));
+    active.el.focus();
+    saveSelection();
+    active.onSave(active.el.innerHTML);
+  };
 
-  const TB = ({ onClick, children, title }) => (
+  if (!active) return null;
+
+  const warnColor = charCount > 80 ? '#dc2626' : charCount > 50 ? '#f59e0b' : '#aaa';
+
+  const Btn = ({ onClick, children, title, active: isActive }) => (
     <button
+      data-fmt-panel="true"
       title={title}
       onMouseDown={e => { e.preventDefault(); saveSelection(); }}
       onClick={e => { e.preventDefault(); e.stopPropagation(); onClick(); }}
       style={{
-        padding: '4px 8px', border: 'none', borderRadius: 5,
-        background: 'rgba(255,255,255,.12)', color: '#fff',
-        fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1.3,
-        minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '100%', padding: '7px 4px', border: 'none', borderRadius: 6,
+        background: isActive ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)',
+        color: '#fff', fontSize: 14, fontWeight: 700,
+        cursor: 'pointer', lineHeight: 1.2,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background .1s',
       }}
     >{children}</button>
   );
 
+  const Sep = () => <div style={{width:'100%', height:1, background:'rgba(255,255,255,.12)', margin:'4px 0'}}/>;
+
+  const Label = ({ children }) => (
+    <div style={{fontSize:9, color:'rgba(255,255,255,.4)', textAlign:'center',
+      textTransform:'uppercase', letterSpacing:'.08em', margin:'6px 0 3px'}}>
+      {children}
+    </div>
+  );
+
   return (
-    <span style={{position:'relative', display:'inline'}}>
-      {focused && (
-        <span
-          ref={toolbarRef}
-          data-export-hide="true"
-          style={{
-            position:'absolute', bottom:'calc(100% + 8px)', left:'50%',
-            transform:'translateX(-50%)',
-            background:'rgba(15,15,15,.92)', backdropFilter:'blur(10px)',
-            borderRadius:10, padding:'5px 8px',
-            display:'flex', gap:3, alignItems:'center',
-            zIndex:9999, whiteSpace:'nowrap',
-            boxShadow:'0 8px 24px rgba(0,0,0,.4)',
-            border:'1px solid rgba(255,255,255,.1)',
-            pointerEvents:'auto',
-          }}
-        >
-          {/* Negrito / Itálico / Sublinhado */}
-          <TB onClick={() => fmt('bold')} title="Negrito (Ctrl+B)"><b>B</b></TB>
-          <TB onClick={() => fmt('italic')} title="Itálico (Ctrl+I)"><i style={{fontStyle:'italic'}}>I</i></TB>
-          <TB onClick={() => fmt('underline')} title="Sublinhado"><u>U</u></TB>
+    <div
+      data-fmt-panel="true"
+      data-export-hide="true"
+      ref={panelRef}
+      tabIndex={-1}
+      style={{
+        position: 'absolute',
+        right: -68, top: 0, bottom: 0,
+        width: 60,
+        background: '#1a1a1a',
+        borderRadius: '0 10px 10px 0',
+        display: 'flex', flexDirection: 'column',
+        padding: '8px 6px',
+        gap: 2,
+        boxShadow: '4px 0 16px rgba(0,0,0,.25)',
+        zIndex: 200,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+      }}
+    >
+      <Label>Estilo</Label>
+      <Btn onClick={() => fmt('bold')} title="Negrito (Ctrl+B)"><b>B</b></Btn>
+      <Btn onClick={() => fmt('italic')} title="Itálico (Ctrl+I)"><i style={{fontStyle:'italic'}}>I</i></Btn>
+      <Btn onClick={() => fmt('underline')} title="Sublinhado"><u>U</u></Btn>
+      <Btn onClick={() => fmt('strikeThrough')} title="Riscado"><s>S</s></Btn>
 
-          <span style={{width:1, height:16, background:'rgba(255,255,255,.2)', margin:'0 4px'}}/>
+      <Sep/>
+      <Label>Tamanho</Label>
 
-          {/* Controle de tamanho de fonte */}
-          <button
-            title="Diminuir fonte"
-            onMouseDown={e => { e.preventDefault(); saveSelection(); }}
-            onClick={e => { e.preventDefault(); e.stopPropagation(); stepSize(-8); }}
-            style={{ width:28, height:28, border:'none', borderRadius:5, background:'rgba(255,255,255,.12)', color:'#fff', fontSize:16, fontWeight:900, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}
-          >−</button>
+      {/* Botão − */}
+      <button data-fmt-panel="true"
+        onMouseDown={e => { e.preventDefault(); saveSelection(); }}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); applySize(size - 8); }}
+        style={{ width:'100%', padding:'6px', border:'none', borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff', fontSize:18, fontWeight:900, cursor:'pointer', lineHeight:1 }}>
+        −
+      </button>
 
-          <input
-            type="number"
-            value={currentSize || ''}
-            onMouseDown={e => e.stopPropagation()}
-            onChange={e => {
-              const v = parseInt(e.target.value);
-              if (!isNaN(v)) { setCurrentSize(v); }
-            }}
-            onKeyDown={e => {
-              e.stopPropagation();
-              if (e.key === 'Enter') { applySize(currentSize || 32); ref.current && ref.current.focus(); }
-            }}
-            onBlur={e => {
-              if (toolbarRef.current && toolbarRef.current.contains(e.relatedTarget)) return;
-              if (currentSize) applySize(currentSize);
-            }}
-            style={{
-              width: 48, textAlign:'center', padding:'2px 4px',
-              border:'1px solid rgba(255,255,255,.25)', borderRadius:5,
-              background:'rgba(255,255,255,.08)', color:'#fff',
-              fontSize:13, fontWeight:700, fontFamily:'ui-monospace,monospace',
-              MozAppearance:'textfield',
-            }}
-          />
-
-          <span style={{fontSize:10, color:'rgba(255,255,255,.4)', marginLeft:-2}}>px</span>
-
-          <button
-            title="Aumentar fonte"
-            onMouseDown={e => { e.preventDefault(); saveSelection(); }}
-            onClick={e => { e.preventDefault(); e.stopPropagation(); stepSize(8); }}
-            style={{ width:28, height:28, border:'none', borderRadius:5, background:'rgba(255,255,255,.12)', color:'#fff', fontSize:16, fontWeight:900, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}
-          >+</button>
-
-          <span style={{width:1, height:16, background:'rgba(255,255,255,.2)', margin:'0 4px'}}/>
-
-          {/* Cor do texto */}
-          <label title="Cor do texto" onMouseDown={e => e.preventDefault()} style={{position:'relative', cursor:'pointer'}}>
-            <span style={{fontSize:13, fontWeight:700, color:'#fff', padding:'4px 6px', borderRadius:5, background:'rgba(255,255,255,.12)', display:'flex', alignItems:'center', gap:4}}>
-              A
-              <span style={{width:12, height:4, background: 'white', borderRadius:2, display:'inline-block'}}/>
-            </span>
-            <input type="color" defaultValue="#ffffff"
-              onMouseDown={e => e.stopPropagation()}
-              onChange={e => { restoreSelection(); document.execCommand('foreColor', false, e.target.value); ref.current && ref.current.focus(); saveSelection(); }}
-              style={{position:'absolute', opacity:0, width:'100%', height:'100%', top:0, left:0, cursor:'pointer'}}
-            />
-          </label>
-
-          <span style={{width:1, height:16, background:'rgba(255,255,255,.2)', margin:'0 4px'}}/>
-
-          <TB onClick={() => { fmt('removeFormat'); if(ref.current) { ref.current.style.fontSize=''; detectSize(); } }} title="Limpar formatação">✕</TB>
-
-          <span style={{fontSize:10, color:'rgba(255,255,255,.35)', fontFamily:'monospace', marginLeft:4}}>
-            <span style={{color:warnColor}}>{charCount}</span>ch
-          </span>
-        </span>
-      )}
-
-      <Tag
-        ref={ref}
-        className={className}
-        style={{
-          ...style,
-          outline: focused ? '2px solid #3b82f6' : 'none',
-          outlineOffset: focused ? 3 : 0,
-          borderRadius: focused ? 4 : 0,
-          transition: 'outline .1s',
+      {/* Input de tamanho */}
+      <input
+        data-fmt-panel="true"
+        type="number" min="8" max="300" step="1"
+        value={sizeInput}
+        onMouseDown={e => e.stopPropagation()}
+        onFocus={e => e.stopPropagation()}
+        onChange={e => setSizeInput(e.target.value)}
+        onKeyDown={e => {
+          e.stopPropagation();
+          if (e.key === 'Enter') { applySize(parseInt(sizeInput) || size); }
         }}
-        contentEditable
-        suppressContentEditableWarning
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onMouseUp={saveSelection}
-        dangerouslySetInnerHTML={{ __html: (value||'').replace(/\n/g,'<br/>') }}
+        onBlur={e => {
+          if (panelRef.current && panelRef.current.contains(e.relatedTarget)) return;
+          const v = parseInt(sizeInput);
+          if (!isNaN(v)) applySize(v);
+        }}
+        style={{
+          width:'100%', textAlign:'center', padding:'5px 2px',
+          border:'1px solid rgba(255,255,255,.2)', borderRadius:6,
+          background:'rgba(255,255,255,.06)', color:'#fff',
+          fontSize:13, fontWeight:700, fontFamily:'ui-monospace,monospace',
+          MozAppearance:'textfield', boxSizing:'border-box',
+        }}
       />
-    </span>
+      <div style={{fontSize:9, color:'rgba(255,255,255,.35)', textAlign:'center', marginTop:-2}}>px</div>
+
+      {/* Botão + */}
+      <button data-fmt-panel="true"
+        onMouseDown={e => { e.preventDefault(); saveSelection(); }}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); applySize(size + 8); }}
+        style={{ width:'100%', padding:'6px', border:'none', borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff', fontSize:18, fontWeight:900, cursor:'pointer', lineHeight:1 }}>
+        +
+      </button>
+
+      <Sep/>
+      <Label>Alinha</Label>
+      <Btn onClick={() => applyAlign('left')} title="Esquerda">⇤</Btn>
+      <Btn onClick={() => applyAlign('center')} title="Centro">≡</Btn>
+      <Btn onClick={() => applyAlign('right')} title="Direita">⇥</Btn>
+
+      <Sep/>
+      <Label>Cor</Label>
+      <label data-fmt-panel="true"
+        title="Cor do texto"
+        onMouseDown={e => e.preventDefault()}
+        style={{position:'relative', cursor:'pointer', display:'block'}}>
+        <div style={{
+          width:'100%', height:32, borderRadius:6,
+          background: color,
+          border:'2px solid rgba(255,255,255,.3)',
+          boxSizing:'border-box',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <span style={{fontSize:12, fontWeight:800, color: '#fff',
+            textShadow:'0 1px 3px rgba(0,0,0,.8)'}}>A</span>
+        </div>
+        <input type="color" value={color}
+          data-fmt-panel="true"
+          onMouseDown={e => e.stopPropagation()}
+          onChange={e => applyColor(e.target.value)}
+          style={{position:'absolute', opacity:0, inset:0, cursor:'pointer', width:'100%', height:'100%'}}
+        />
+      </label>
+
+      <Sep/>
+      <Btn onClick={() => fmt('removeFormat')} title="Limpar formatação">✕</Btn>
+
+      {/* Contador de chars */}
+      <div style={{
+        marginTop:'auto', paddingTop:6,
+        fontSize:9, color:warnColor,
+        textAlign:'center', fontFamily:'ui-monospace,monospace',
+      }}>
+        {charCount}ch
+      </div>
+    </div>
   );
 }
+window.MLTextFormatPanel = TextFormatPanel;
 
 /* =============== EXPORT TO PNG =============== */
 const FONT_FILES = [
