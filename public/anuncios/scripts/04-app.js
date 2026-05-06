@@ -116,10 +116,18 @@ async function autoGenerate(uploadedDataUrls) {
   const src = uploadedDataUrls[0];
   const src2 = uploadedDataUrls[1] || src;
 
-  // Foto principal — todas as fotos usam mainImg por padrão
+  // mainImg = fallback global (mantido para compatibilidade)
   out.mainImg = src;
 
-  // Fotos 5/6 — miniatura igual à foto 1 (mainImg já serve)
+  // Cada slot começa com a mesma imagem — mas são independentes
+  // Só seta se ainda não tiver imagem própria (não sobrescreve customizações)
+  out.p1_img = src;
+  out.p2_img = src;
+  out.p3_img = src;
+  out.p4_img = src;
+  out.p5_img = src;
+  out.p6_img = src;
+
   // Lifestyle usa 2ª foto se disponível
   out.p5_lifestyle = src2;
   out.p6_lifestyle = src2;
@@ -239,19 +247,18 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
   // Foto 1 — hero estúdio, fundo branco
   if (slotNum === 1) {
     const img = await callGptImage1(src, getPrompt(1));
-    return { mainImg: img };
+    return { p1_img: img };
   }
 
   // Foto 2 — produto + 2 miniaturas de close num único prompt
   if (slotNum === 2) {
     const img = await callGptImage1(src, getPrompt(2));
-    // A imagem gerada já contém o produto + os closes integrados
-    return { mainImg: img };
+    return { p2_img: img };
   }
 
-  // Foto 3 — reutiliza mainImg da foto 1, zero custo de API
+  // Foto 3 — reutiliza imagem da foto 1, zero custo de API
   if (slotNum === 3) {
-    return {}; // mainImg já está correto, não precisa de nada
+    return {}; // p3_img já está correto, não precisa de nada
   }
 
   // Foto 4 — lifestyle
@@ -260,7 +267,7 @@ async function generatePhotoWithAI(slotNum, sourceImgs) {
     return { p5_lifestyle: img, p6_lifestyle: img };
   }
 
-  // Fotos 5/6 — miniatura da foto 1 = mainImg, sem API
+  // Fotos 5/6 — sem API
   return {};
 }
 
@@ -1629,10 +1636,10 @@ function App() {
             <VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>
             <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
               <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
-              <ClipboardBar hasImg={!!data.mainImg}
-                onCopy={() => { window._imgClipboard = data.mainImg; }}
-                onPaste={(img) => set('mainImg', img)}/>
-              <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+              <ClipboardBar hasImg={!!(data.p1_img||data.mainImg)}
+                onCopy={() => { window._imgClipboard = data.p1_img||data.mainImg; }}
+                onPaste={(img) => set('p1_img', img)}/>
+              <RotateCropBar imgKey="p1_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
               <window.MLImgAdjustBar slotKey="p1" data={data} set={set}/>
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
                 label="✦ Gerar estúdio" title="Gera foto com fundo branco de estúdio (~$0.04)"
@@ -1645,10 +1652,10 @@ function App() {
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
-            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <ClipboardBar hasImg={!!(data.p2_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p2_img||data.mainImg; }}
+              onPaste={(img) => set('p2_img', img)}/>
+            <RotateCropBar imgKey="p2_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
             <window.MLImgAdjustBar slotKey="p2" data={data} set={set}/>
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar produto + 2 closes" title="Produto com 2 miniaturas de close integradas (~$0.04)"
@@ -1660,10 +1667,10 @@ function App() {
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
-            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <ClipboardBar hasImg={!!(data.p3_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p3_img||data.mainImg; }}
+              onPaste={(img) => set('p3_img', img)}/>
+            <RotateCropBar imgKey="p3_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
             <window.MLImgAdjustBar slotKey="p3" data={data} set={set}/>
             <span style={{fontSize:11,color:'#6b7280',fontStyle:'italic'}}>Usa foto 1 (sem custo)</span>
           </div>}>
@@ -1673,10 +1680,10 @@ function App() {
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
-            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <ClipboardBar hasImg={!!(data.p4_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p4_img||data.mainImg; }}
+              onPaste={(img) => set('p4_img', img)}/>
+            <RotateCropBar imgKey="p4_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
             <window.MLImgAdjustBar slotKey="p4" data={data} set={set}/>
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar lifestyle" title="Produto em uso no ambiente real (~$0.04)"
@@ -1688,10 +1695,10 @@ function App() {
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
-            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <ClipboardBar hasImg={!!(data.p5_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p5_img||data.mainImg; }}
+              onPaste={(img) => set('p5_img', img)}/>
+            <RotateCropBar imgKey="p5_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
             <window.MLImgAdjustBar slotKey="p5" data={data} set={set}/>
           </div>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
@@ -1700,10 +1707,10 @@ function App() {
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             <ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>
-            <ClipboardBar hasImg={!!data.mainImg}
-              onCopy={() => { window._imgClipboard = data.mainImg; }}
-              onPaste={(img) => set('mainImg', img)}/>
-            <RotateCropBar imgKey="mainImg" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
+            <ClipboardBar hasImg={!!(data.p6_img||data.mainImg)}
+              onCopy={() => { window._imgClipboard = data.p6_img||data.mainImg; }}
+              onPaste={(img) => set('p6_img', img)}/>
+            <RotateCropBar imgKey="p6_img" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>
             <window.MLImgAdjustBar slotKey="p6" data={data} set={set}/>
           </div>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>

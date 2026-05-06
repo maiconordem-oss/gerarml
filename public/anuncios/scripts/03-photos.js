@@ -46,7 +46,7 @@ function Photo1A({ data, set, bgMode }) {
         )}
       </Drag>
       <Drag id="p1_main" data={data} set={set} enabled={bgMode} style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-        <PanZoom src={data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+        <PanZoom src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
       </Drag>
     </div>
   );
@@ -90,7 +90,7 @@ function Photo1E({ data, set, bgMode }) {
     <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', overflow: 'hidden' }}>
       {/* Produto */}
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 60 }}>
-        <PanZoom src={data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+        <PanZoom src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
       </div>
 
       {/* Círculo único movível */}
@@ -133,7 +133,7 @@ function Photo1E({ data, set, bgMode }) {
 function Photo1C({ data, set, bgMode }) {
   return (
     <div style={{ width: '100%', height: '100%', background: bgMode ? 'transparent' : '#fff', position: 'relative', display: 'grid', placeItems: 'center', padding: 80 }}>
-      <PanZoom src={data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+      <PanZoom src={data.p1_img||data.mainImg} zoom={data.p1_zoom||1} panKey="p1_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
     </div>
   );
 }
@@ -168,7 +168,7 @@ function Photo2({ data, set, bgMode }) {
           onTitle={(v) => set('p2_f4_title', v)} onText={(v) => set('p2_f4_text', v)} />
         </Drag>
         <Drag id="p2_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-          <PanZoom src={data.mainImg} zoom={data.p2_zoom||1} panKey="p2_pan" data={data} set={set} wrapStyle={{ width:'62%', height:'72%' }}/>
+          <PanZoom src={data.p2_img||data.mainImg} zoom={data.p2_zoom||1} panKey="p2_pan" data={data} set={set} wrapStyle={{ width:'62%', height:'72%' }}/>
         </Drag>
         {!bgMode && <><Arrow d="M 22,16 C 32,28 36,36 44,46" />
         <Arrow d="M 78,16 C 68,28 64,36 56,46" />
@@ -258,7 +258,7 @@ function Photo3({ data, set, bgMode }) {
         </Drag>
 
         <Drag id="p3_main" data={data} set={set} enabled={bgMode} style={{ position: 'absolute', right: 0, top: 0, width: '58%', height: '100%' }}>
-          <PanZoom src={data.mainImg} zoom={data.p3_zoom||1} panKey="p3_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+          <PanZoom src={data.p3_img||data.mainImg} zoom={data.p3_zoom||1} panKey="p3_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
         </Drag>
 
         {!bgMode && <><Arrow d="M 30,16 C 40,18 44,20 50,24" />
@@ -317,7 +317,7 @@ function Photo4({ data, set, bgMode }) {
       </h1>
 
       <Drag id="p4_main" data={data} set={set} enabled={bgMode} style={{ flex: 1, display: 'grid', placeItems: 'center', margin: '20px 0' }}>
-        <PanZoom src={data.mainImg} zoom={data.p4_zoom||1} panKey="p4_pan" data={data} set={set} wrapStyle={{ width:'82%', height:'72%' }}/>
+        <PanZoom src={data.p4_img||data.mainImg} zoom={data.p4_zoom||1} panKey="p4_pan" data={data} set={set} wrapStyle={{ width:'82%', height:'72%' }}/>
       </Drag>
 
       <Drag id="p4_benefits" data={data} set={set} enabled={bgMode} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 30 }}>
@@ -370,7 +370,7 @@ function Photo5({ data, set, bgMode }) {
         <Drag id="p5_mini" data={data} set={set} enabled
           defaultPos={{ x: 750, y: 700 }}
           style={{ position: 'absolute', top: 0, left: 0, width: data.p5_mini_size || 280, height: data.p5_mini_size || 280, display: 'grid', placeItems: 'center' }}>
-          <PanZoom src={data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+          <PanZoom src={data.p5_img||data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
         </Drag>
       </div>
     );
@@ -405,7 +405,7 @@ function Photo5({ data, set, bgMode }) {
         onA={(v) => set('p5_t3_text_a', v)} onHl={(v) => set('p5_t3_hl', v)} onB={(v) => set('p5_t3_text_b', v)} />
 
         <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320 }}>
-          <PanZoom src={data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set} wrapStyle={{ height: data.p5_mini_size||280, maxWidth:'85%' }}/>
+          <PanZoom src={data.p5_img||data.mainImg} zoom={data.p5_zoom||1} panKey="p5_pan" data={data} set={set} wrapStyle={{ height: data.p5_mini_size||280, maxWidth:'85%' }}/>
         </div>
       </div>
 
@@ -523,7 +523,7 @@ function Photo6({ data, set, bgMode }) {
         <Drag id="p6_mini" data={data} set={set} enabled
           defaultPos={{ x: 750, y: 700 }}
           style={{ position: 'absolute', top: 0, left: 0, width: data.p6_mini_size || 280, height: data.p6_mini_size || 280, display: 'grid', placeItems: 'center' }}>
-          <PanZoom src={data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
+          <PanZoom src={data.p6_img||data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set} wrapStyle={{ width:'100%', height:'100%' }}/>
         </Drag>
       </div>
     );
@@ -558,7 +558,7 @@ function Photo6({ data, set, bgMode }) {
         onA={(v) => set('p6_t3_text_a', v)} onHl={(v) => set('p6_t3_hl', v)} onB={(v) => set('p6_t3_text_b', v)} />
 
         <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 0, paddingBottom: 320 }}>
-          <PanZoom src={data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set} wrapStyle={{ height: data.p6_mini_size||280, maxWidth:'85%' }}/>
+          <PanZoom src={data.p6_img||data.mainImg} zoom={data.p6_zoom||1} panKey="p6_pan" data={data} set={set} wrapStyle={{ height: data.p6_mini_size||280, maxWidth:'85%' }}/>
         </div>
       </div>
 
