@@ -1849,7 +1849,7 @@ function App() {
       )}
 
       {/* Painel de formatação de texto — fixo na lateral direita da tela */}
-      <window.MLTextFormatPanel />
+      {React.createElement(window.MLTextFormatPanel || 'span')}
 
       {cropState && (
         <window.MLCropOverlay
