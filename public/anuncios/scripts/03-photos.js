@@ -298,9 +298,12 @@ function DimLabel({ value, onChange, style }) {
 
 /* ============== Photo 4: Solução ideal ============== */
 function Photo4({ data, set, bgMode }) {
+  const textMode = data && data.__textMode;
   return (
-    <div className="tpl" style={{ padding: '80px 90px 60px', background: bgMode ? 'transparent' : undefined }}>
-      <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1 }}>
+    <div className="tpl" style={{ padding: '80px 90px 60px', background: bgMode ? 'transparent' : undefined, position: 'relative' }}>
+
+      {/* Título */}
+      <h1 style={{ textAlign: 'center', fontSize: 64, lineHeight: 1.1, position: 'relative', zIndex: 10 }}>
         <Ed value={data.p4_title_a} onChange={(v) => set('p4_title_a', v)} />
         {' '}
         <Ed value={data.p4_title_b} onChange={(v) => set('p4_title_b', v)} className="green" />
@@ -310,47 +313,61 @@ function Photo4({ data, set, bgMode }) {
         <span className="pill-yellow-inline"><Ed value={data.p4_title_pill} onChange={(v) => set('p4_title_pill', v)} /></span>
       </h1>
 
+      {/* Imagem do produto — livre */}
       <PanZoom src={data.p4_img||data.mainImg} zoom={data.p4_zoom||1} panKey="p4_pan" data={data} set={set}/>
 
-      <Drag id="p4_benefits" data={data} set={set} enabled={bgMode} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 30 }}>
+      {/* 2 características com ícone — acima do callout, zIndex alto */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        gap: 32, marginBottom: 30,
+      }}>
+        {/* Esquerda */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
-          <div className="ic-square" style={{ width: 110, height: 110, borderRadius: 22, flexShrink: 0 }}>
-            {React.cloneElement(<Ic.tools />, { style: { width: 62, height: 62, color: '#fff', stroke: '#fff' } })}
-          </div>
+          <IcPicker iconKey="p4_ic1" data={data} set={set} size={110} borderRadius={22}/>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <Ed value={data.p4_b1_title} onChange={(v) => set('p4_b1_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: '#1F7A3A', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
-            <Ed value={data.p4_b1_text} onChange={(v) => set('p4_b1_text', v)} multi style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', display: 'block', marginTop: 8 }} />
+            <Ed value={data.p4_b1_title} onChange={(v) => set('p4_b1_title', v)}
+              style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: 'var(--green,#1F7A3A)', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
+            <Ed value={data.p4_b1_text} onChange={(v) => set('p4_b1_text', v)} multi
+              style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', display: 'block', marginTop: 8 }} />
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexDirection: 'row-reverse' }}>
-          <div className="ic-square" style={{ width: 110, height: 110, borderRadius: 22, flexShrink: 0 }}>
-            {React.cloneElement(<Ic.shield />, { style: { width: 62, height: 62, color: '#fff', stroke: '#fff' } })}
-          </div>
-          <div style={{ minWidth: 0, flex: 1, textAlign: 'right' }}>
-            <Ed value={data.p4_b2_title} onChange={(v) => set('p4_b2_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: '#1F7A3A', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
-            <Ed value={data.p4_b2_text} onChange={(v) => set('p4_b2_text', v)} multi style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', display: 'block', marginTop: 8 }} />
-          </div>
-        </div>
-      </Drag>
 
-      <Drag id="p4_callout" data={data} set={set} enabled={bgMode}>
-      {bgMode ? (
-        <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'left', maxWidth: 900, marginRight: 'auto' }}>
-          <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 40, fontWeight: 800, display: 'block', lineHeight: 1.1, color: '#fff', maxHeight: 88, overflow: 'hidden' }} />
-          <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)} style={{ fontSize: 28, opacity: .95, lineHeight: 1.3, color: '#fff', display: 'block', maxHeight: 73, overflow: 'hidden' }} />
-        </div>
-      ) : (
-      <div className="callout">
-        <div className="ic"><Ic.check style={{ width: 30, height: 30, strokeWidth: 3.5 }} /></div>
-        <div className="txt">
-          <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)} style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, display: 'block', lineHeight: 1.1 }} />
-          <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)} style={{ fontSize: 21, opacity: .95, lineHeight: 1.3 }} />
+        {/* Direita — alinhado à direita */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexDirection: 'row-reverse' }}>
+          <IcPicker iconKey="p4_ic2" data={data} set={set} size={110} borderRadius={22}/>
+          <div style={{ minWidth: 0, flex: 1, textAlign: 'right' }}>
+            <Ed value={data.p4_b2_title} onChange={(v) => set('p4_b2_title', v)}
+              style={{ fontFamily: 'Montserrat', fontSize: 32, fontWeight: 800, color: 'var(--green,#1F7A3A)', display: 'block', lineHeight: 1, whiteSpace: 'nowrap' }} />
+            <Ed value={data.p4_b2_text} onChange={(v) => set('p4_b2_text', v)} multi
+              style={{ fontSize: 24, lineHeight: 1.25, color: '#1A1A1A', display: 'block', marginTop: 8, textAlign: 'right' }} />
+          </div>
         </div>
       </div>
-      )}
-      </Drag>
-    </div>);
 
+      {/* Callout — fixo na parte inferior, centralizado */}
+      <div style={{ position: 'relative', zIndex: 10 }}>
+        {bgMode ? (
+          <div style={{ padding: '20px 30px', color: '#fff', textAlign: 'center', maxWidth: 900, margin: '0 auto' }}>
+            <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)}
+              style={{ fontFamily: 'Montserrat', fontSize: 40, fontWeight: 800, display: 'block', lineHeight: 1.1, color: '#fff' }} />
+            <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)}
+              style={{ fontSize: 28, opacity: .95, lineHeight: 1.3, color: '#fff', display: 'block' }} />
+          </div>
+        ) : (
+          <div className="callout">
+            <div className="ic"><Ic.check style={{ width: 30, height: 30, strokeWidth: 3.5 }} /></div>
+            <div className="txt">
+              <Ed value={data.p4_callout_title} onChange={(v) => set('p4_callout_title', v)}
+                style={{ fontFamily: 'Montserrat', fontSize: 30, fontWeight: 800, display: 'block', lineHeight: 1.1 }} />
+              <Ed value={data.p4_callout_text} onChange={(v) => set('p4_callout_text', v)}
+                style={{ fontSize: 21, opacity: .95, lineHeight: 1.3 }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>);
 }
 
 /* ============== Photo 5: Garantia + Credibilidade — IDÊNTICA ao original ============== */

@@ -51,8 +51,10 @@ const INITIAL = {
   p4_title_pill: 'NIVELAMENTO PRECISO.',
   p4_b1_title: 'Profissional:',
   p4_b1_text: 'Indicado para uso pesado em oficinas mecânicas.',
+  p4_ic1: 'tools',
   p4_b2_title: 'Alta Qualidade:',
   p4_b2_text: 'Feito em aço tratado e com pintura anticorrosiva.',
+  p4_ic2: 'shield',
   p4_callout_title: 'Suporte para instalação suspensa:',
   p4_callout_text: 'Argola compatível com guinchos, talhas e suportes aéreos.',
 
