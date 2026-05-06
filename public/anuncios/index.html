@@ -263,27 +263,30 @@ html, body {
 /* Bottom callout band */
 .callout {
   margin-top: auto;
-  background: var(--green);
+  background: transparent;
   color: white;
-  border-radius: 14px;
-  padding: 26px 36px;
+  padding: 26px 36px 26px 120px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-direction: column;
 }
 .callout .ic { display: none; }
 .callout .txt { line-height: 1.2; }
 .callout .txt b {
   font-family: 'Montserrat', sans-serif;
-  font-size: 30px;
+  font-size: 38px;
   font-weight: 800;
   display: block;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0,0,0,.35);
 }
 .callout .txt span {
   font-family: 'Montserrat', sans-serif;
-  font-size: 21px;
-  opacity: .92;
+  font-size: 26px;
+  color: rgba(255,255,255,.95);
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
+  text-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
 
 /* Feature card with icon */
