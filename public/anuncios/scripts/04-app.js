@@ -166,12 +166,12 @@ async function callGptImage1(imageDataUrl, prompt) {
 
   const blob = await toPngBlob(imageDataUrl, 1024);
   const form = new FormData();
-  form.append('model', 'gpt-image-1');
+  form.append('model', 'gpt-image-1-mini');
   form.append('image', blob, 'product.png');
   form.append('prompt', prompt);
   form.append('n', '1');
   form.append('size', '1024x1024');
-  form.append('quality', 'high');
+  form.append('quality', 'medium');
 
   const resp = await fetch('https://api.openai.com/v1/images/edits', {
     method: 'POST',

@@ -237,7 +237,7 @@ async function improveQuality(dataUrl){
   }
 
   const form=new FormData();
-  form.append('model','gpt-image-1');
+  form.append('model','gpt-image-1-mini');
   form.append('image',pngBlob,'image.png');
   form.append('prompt','Melhore esta foto de produto para e-commerce: corrija iluminação, aumente nitidez, equilibre cores e branqueie levemente o fundo mantendo o produto idêntico. Preserve todos os detalhes do produto sem alterar forma ou texto.');
   form.append('n','1');
@@ -277,7 +277,7 @@ async function generateVariation(dataUrl){
   }
 
   const form=new FormData();
-  form.append('model','gpt-image-1');
+  form.append('model','gpt-image-1-mini');
   form.append('image',pngBlob,'image.png');
   form.append('prompt','Recrie esta foto de produto para e-commerce com fundo branco puro e limpo, iluminação profissional de estúdio, sombra suave, sem reflexos e alta definição. O produto deve ser idêntico ao original.');
   form.append('n','1');
