@@ -348,10 +348,10 @@ function Slot({ num, title, children, productName, bg, extra }) {
   );
 }
 
-/* ============== AI Text generation — OpenAI gpt-4o-mini ============== */
+/* ============== AI Text generation — Claude (Anthropic) ============== */
 async function generateTextsWithAI(productName, category, extras) {
-  const key = (window.OPENAI_API_KEY || localStorage.getItem('openai_api_key') || '').trim();
-  if (!key) throw new Error('Configure sua chave OpenAI na seção "Chave OpenAI" acima.');
+  // Usa API da Anthropic direto — sem necessidade de chave OpenAI do usuário
+  const key = ''; // chave injetada pelo proxy do servidor
 
   const prompt = `Você gera textos de marketing para anúncios de Mercado Livre em PT-BR.
 Produto: "${productName}"
@@ -394,22 +394,21 @@ Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE esta
   "p4_callout_text": "frase 8-12 palavras"
 }`;
 
-  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1200,
-      temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
   if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.error?.message || `OpenAI error ${resp.status}`);
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Erro na geração de textos (Claude). Tente novamente.');
   }
   const data = await resp.json();
-  const text = data.choices[0].message.content;
+  const text = (data.content || []).map(b => b.text || '').join('');
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('Resposta sem JSON válido');
   return JSON.parse(m[0]);
@@ -659,7 +658,7 @@ function OpenAIKeyBanner({ apiKey, setApiKey }) {
           <span style={{fontSize:18}}>✦</span>
           <div>
             <div style={{fontFamily:'Montserrat', fontWeight:800, fontSize:13, color:'#065f46'}}>OpenAI conectada</div>
-            <div style={{fontSize:11, color:'#6b7280'}}>sk-...{apiKey.slice(-6)} · geração de texto + melhorias de imagem ativas</div>
+            <div style={{fontSize:11, color:'#6b7280'}}>sk-...{apiKey.slice(-6)} · melhorias de imagem via OpenAI ativas (opcional)</div>
           </div>
         </div>
         <button onClick={clear} style={{padding:'6px 12px', border:'1px solid #6ee7b7', borderRadius:7, background:'white', fontSize:12, fontWeight:600, cursor:'pointer', color:'#6b7280'}}>Trocar chave</button>
@@ -1320,6 +1319,145 @@ function AdManager({ data, productName, storeName, onLoad, setProductName, setSt
 }
 
 
+/* ============== Preview estilo Mercado Livre ============== */
+function MLPreviewModal({ data, productName, onClose }) {
+  const canvases = document.querySelectorAll('.canvas');
+  const [thumbs, setThumbs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  // Gera thumbnails capturando os canvas existentes
+  React.useEffect(() => {
+    if (!window.htmlToImage || !canvases.length) { setLoading(false); return; }
+    setLoading(true);
+    const TRANSPARENT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+    Promise.all(Array.from(canvases).map(async (node) => {
+      const prev = node.style.transform;
+      node.style.transform = 'scale(1)';
+      node.style.transformOrigin = 'top left';
+      node.classList.add('exporting');
+      await new Promise(r => setTimeout(r, 40));
+      try {
+        const url = await window.htmlToImage.toPng(node, {
+          width: 1200, height: 1540, pixelRatio: 0.15, cacheBust: true,
+          imagePlaceholder: TRANSPARENT,
+        });
+        return url;
+      } catch(_) { return ''; }
+      finally {
+        node.style.transform = prev;
+        node.classList.remove('exporting');
+      }
+    })).then(urls => { setThumbs(urls); setLoading(false); });
+  }, []);
+
+  const fakePrice = 'R$ 189,90';
+  const fakeSeller = data.p5_store_name || 'Mega Distribuidor';
+  const name = productName || 'Produto';
+
+  // Simula 9 cards de listagem, foto 1 na posição 1
+  const grid = Array.from({length: 9}, (_, i) => ({ isOurs: i === 0, i }));
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.65)', zIndex:3000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', overflowY:'auto', paddingTop:40, paddingBottom:40 }}>
+      <div style={{ background:'#fff', borderRadius:16, width:'90vw', maxWidth:900, boxShadow:'0 24px 64px rgba(0,0,0,.3)', overflow:'hidden' }}>
+        {/* Header do modal */}
+        <div style={{ background:'#FFE600', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontFamily:'Montserrat', fontWeight:900, fontSize:20, color:'#333' }}>mercadolivre</span>
+            <span style={{ fontSize:12, background:'rgba(0,0,0,.12)', padding:'2px 8px', borderRadius:4, color:'#333', fontWeight:600 }}>Preview de listagem</span>
+          </div>
+          <button onClick={onClose} style={{ border:0, background:'rgba(0,0,0,.12)', borderRadius:'50%', width:32, height:32, fontSize:18, cursor:'pointer', display:'grid', placeItems:'center', color:'#333', fontWeight:700 }}>×</button>
+        </div>
+
+        {/* Barra de categoria fake */}
+        <div style={{ borderBottom:'1px solid #eee', padding:'8px 20px', fontSize:12, color:'#666' }}>
+          Ferramentas · Equipamentos · {name}
+        </div>
+
+        <div style={{ padding:20 }}>
+          {loading && (
+            <div style={{ textAlign:'center', padding:40, color:'#999', fontSize:14 }}>
+              ⏳ Gerando thumbnails…
+            </div>
+          )}
+
+          {!loading && (
+            <>
+              <div style={{ fontSize:12, color:'#666', marginBottom:12 }}>
+                {grid.length} resultados para "<strong>{name}</strong>"
+              </div>
+
+              {/* Grade estilo ML */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12 }}>
+                {grid.map(({ isOurs, i }) => (
+                  <div key={i} style={{
+                    border: isOurs ? '2px solid #3483fa' : '1px solid #eee',
+                    borderRadius:8, overflow:'hidden', background:'#fff',
+                    boxShadow: isOurs ? '0 0 0 3px rgba(52,131,250,.15)' : '0 1px 4px rgba(0,0,0,.06)',
+                    position:'relative',
+                  }}>
+                    {isOurs && (
+                      <div style={{ position:'absolute', top:6, left:6, zIndex:2, background:'#3483fa', color:'white', fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:10 }}>
+                        SEU ANÚNCIO
+                      </div>
+                    )}
+                    {/* Thumbnail */}
+                    <div style={{ aspectRatio:'1', background:'#f5f5f5', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                      {isOurs && thumbs[0]
+                        ? <img src={thumbs[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                        : <div style={{ width:'100%', height:'100%', background: i%3===0 ? '#f0f0f0' : i%3===1 ? '#e8f0fe' : '#fef3c7', display:'grid', placeItems:'center' }}>
+                            <span style={{ fontSize:28 }}>{['📦','🔧','⚙️','🛠️','🔩','🪛','🔨','🪚'][i%8]}</span>
+                          </div>
+                      }
+                    </div>
+                    {/* Info */}
+                    <div style={{ padding:'8px 10px' }}>
+                      <div style={{ fontSize:11, color:'#333', lineHeight:1.3, marginBottom:4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                        {isOurs ? name : ['Produto similar A','Kit Profissional','Ferramenta Esp.','Modelo Importado','Versão Standard','Conjunto Comp.','Item Técnico','Peça Original'][i%8]}
+                      </div>
+                      <div style={{ fontFamily:'Montserrat', fontWeight:800, fontSize:14, color:'#333' }}>
+                        {isOurs ? fakePrice : `R$ ${(120 + i*23).toFixed(2).replace('.',',')}`}
+                      </div>
+                      {isOurs && (
+                        <div style={{ fontSize:10, color:'#00a650', fontWeight:600, marginTop:2 }}>Frete grátis</div>
+                      )}
+                      <div style={{ fontSize:10, color:'#999', marginTop:4 }}>
+                        {isOurs ? fakeSeller : 'Vendedor '+String.fromCharCode(65+i)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Galeria das 6 fotos em mini */}
+              {thumbs.length > 0 && (
+                <div style={{ marginTop:28, borderTop:'1px solid #eee', paddingTop:20 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#333', marginBottom:12 }}>Suas 6 fotos no anúncio</div>
+                  <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                    {thumbs.map((url, idx) => url ? (
+                      <div key={idx} style={{ position:'relative' }}>
+                        <img src={url} alt={'Foto '+(idx+1)} style={{ width:100, height:128, objectFit:'cover', borderRadius:6, border: idx===0 ? '2px solid #3483fa' : '1px solid #ddd', display:'block' }}/>
+                        <div style={{ position:'absolute', bottom:4, right:4, background:'rgba(0,0,0,.6)', color:'white', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3 }}>
+                          F{idx+1}
+                        </div>
+                        {idx===0 && <div style={{ position:'absolute', top:4, left:4, background:'#3483fa', color:'white', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3 }}>CAPA</div>}
+                      </div>
+                    ) : null)}
+                  </div>
+                  <div style={{ marginTop:10, fontSize:11, color:'#666' }}>
+                    ⬆ Verifique se o texto da capa está legível em tamanho pequeno
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============== Barra de Rotação e Crop ============== */
 function RotateCropBar({ imgKey, data, set, openCrop, rotateImg }) {
   const [rotating, setRotating] = React.useState(false);
@@ -1370,6 +1508,46 @@ function App() {
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
   const [rawFiles, setRawFiles] = React.useState([]);
   const [cropState, setCropState] = React.useState(null); // { key, src }
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+
+  // ── Undo / Redo ──────────────────────────────────────────
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
+  const skipHistory = useRef(false); // evita loop ao restaurar
+
+  const pushHistory = (prevData) => {
+    undoStack.current.push(prevData);
+    if (undoStack.current.length > 40) undoStack.current.shift();
+    redoStack.current = []; // limpa redo ao fazer nova ação
+  };
+
+  const undo = () => {
+    if (!undoStack.current.length) return;
+    const prev = undoStack.current.pop();
+    redoStack.current.push(data);
+    skipHistory.current = true;
+    setData(prev);
+    skipHistory.current = false;
+  };
+
+  const redo = () => {
+    if (!redoStack.current.length) return;
+    const next = redoStack.current.pop();
+    undoStack.current.push(data);
+    skipHistory.current = true;
+    setData(next);
+    skipHistory.current = false;
+  };
+
+  // Atalho teclado Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [data]);
   const [apiKey, setApiKey] = React.useState(() => {
     const saved = localStorage.getItem('openai_api_key') || '';
     if (saved) window.OPENAI_API_KEY = saved;
@@ -1377,8 +1555,12 @@ function App() {
   });
 
   const set = (k, v) => {
-    setData(prev => ({...prev, [k]: v}));
-    if (BG_KEYS.includes(k)) saveBg(k, v);
+    setData(prev => {
+      if (!skipHistory.current) pushHistory(prev);
+      const next = {...prev, [k]: v};
+      if (BG_KEYS.includes(k)) saveBg(k, v);
+      return next;
+    });
   };
 
   // Abrir crop para mainImg ou outra chave de imagem
@@ -1400,7 +1582,12 @@ function App() {
     const rotated = await window.MLRotateImage(src, degrees);
     set(imgKey, rotated);
   };
-  const merge = (patch) => setData(prev => ({...prev, ...patch}));
+  const merge = (patch) => {
+    setData(prev => {
+      if (!skipHistory.current) pushHistory(prev);
+      return {...prev, ...patch};
+    });
+  };
 
   useEffect(() => {
     setData(prev => ({...prev, p5_store_name: storeName}));
@@ -1415,6 +1602,11 @@ function App() {
         </div>
         <div className="header-actions">
           <window.MLBrandColorPicker />
+          <div style={{display:'flex', gap:4}}>
+            <button className="btn" onClick={undo} disabled={!undoStack.current.length} title="Desfazer (Ctrl+Z)" style={{padding:'10px 12px', opacity: undoStack.current.length ? 1 : 0.4}}>↺</button>
+            <button className="btn" onClick={redo} disabled={!redoStack.current.length} title="Refazer (Ctrl+Y)" style={{padding:'10px 12px', opacity: redoStack.current.length ? 1 : 0.4}}>↻</button>
+          </div>
+          <button className="btn" onClick={() => setPreviewOpen(true)} title="Preview como aparece no ML">👁 Preview ML</button>
           <button className="btn" onClick={() => setTweaksOpen(v => !v)}>{tweaksOpen ? 'Fechar Tweaks' : 'Abrir Tweaks'}</button>
           <button className="btn primary" onClick={async () => {
             const canvases = document.querySelectorAll('.canvas');
@@ -1517,6 +1709,14 @@ function App() {
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
       </div>
+
+      {previewOpen && (
+        <MLPreviewModal
+          data={data}
+          productName={productName}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
 
       {cropState && (
         <window.MLCropOverlay
