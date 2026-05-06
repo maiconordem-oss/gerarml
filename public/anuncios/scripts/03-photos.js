@@ -26,6 +26,29 @@ function BgPlaceholder({ style = {} }) {
 /* ZoomedImg substituído por PanZoom (MLPanZoomImg) — suporta pan + zoom */
 
 /* ---- VARIANTE A: 3 círculos (atual) ---- */
+/* ============== Callout — barra verde sobreposta na base ============== */
+function Callout({ titleKey, textKey, data, set, bgMode }) {
+  if (bgMode) {
+    return (
+      <div className="callout" style={{ background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', marginTop: 'auto' }}>
+        <div className="txt">
+          <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
+          <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="callout">
+      <div className="txt">
+        <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
+        <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
+      </div>
+    </div>
+  );
+}
+
+
 function Photo1A({ data, set, bgMode }) {
   const circles = data.p1_circles || [];
   return (
@@ -146,28 +169,6 @@ function Photo1({ data, set, bgMode }) {
   return <Photo1A data={data} set={set} bgMode={bgMode} />;
 }
 
-
-/* ============== Callout — barra verde sobreposta na base ============== */
-function Callout({ titleKey, textKey, data, set, bgMode }) {
-  if (bgMode) {
-    return (
-      <div className="callout" style={{ background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', marginTop: 'auto' }}>
-        <div className="txt">
-          <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
-          <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="callout">
-      <div className="txt">
-        <b><Ed value={data[titleKey]} onChange={(v) => set(titleKey, v)}/></b>
-        <span><Ed value={data[textKey]} onChange={(v) => set(textKey, v)}/></span>
-      </div>
-    </div>
-  );
-}
 
 /* ============== Photo 2: Características principais ============== */
 function Photo2({ data, set, bgMode }) {
