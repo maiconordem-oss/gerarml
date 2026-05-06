@@ -146,8 +146,6 @@ function Photo1E({ data, set, bgMode }) {
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
       </div>
-      {/* Callout sobreposto na base */}
-      {!bgMode && <Callout titleKey="p1_callout_title" textKey="p1_callout_text" data={data} set={set} bgMode={bgMode}/>}
     </div>
   );
 }
