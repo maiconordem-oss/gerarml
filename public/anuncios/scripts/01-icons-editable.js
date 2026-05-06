@@ -185,11 +185,12 @@ async function exportCanvas(node, filename) {
    wrapStyle ainda aceito para compatibilidade mas ignorado (posição livre)
 */
 function PanZoomImg({ src, zoom=1, panKey, data, set, wrapStyle={}, disabled=false }) {
-  // Estado: { x, y, scale } — x/y em px no canvas (1200×1540), scale multiplicador
   const state = (panKey && data && data[panKey]) || { x:0, y:0, scale:1 };
   const imgRef = useRef(null);
   const dragging = useRef(false);
   const lastZoom = useRef(zoom);
+  // Quando textMode está ativo, desabilita interação com a imagem
+  const isLocked = !!(data && data.__textMode);
 
   // Quando zoom externo muda, propaga pro scale interno proporcionalmente
   useEffect(() => {
@@ -260,35 +261,34 @@ function PanZoomImg({ src, zoom=1, panKey, data, set, wrapStyle={}, disabled=fal
     }
   };
 
-  // ── Render vazio ──
   if (!src) return null;
 
   const sc = state.scale || 1;
-  const canInteract = !disabled && set && panKey;
-
-  // Tamanho base da imagem: 800px de largura no canvas (ajustável via scale)
+  const canInteract = !disabled && !isLocked && set && panKey;
   const BASE = 800;
 
   return (
     <div
       ref={imgRef}
       data-panzoom="true"
-      onMouseDown={onMouseDown}
-      onWheel={onWheel}
+      onMouseDown={canInteract ? onMouseDown : undefined}
+      onWheel={canInteract ? onWheel : undefined}
       style={{
         position: 'absolute',
-        // Centro do canvas como origem, depois translate por x/y
         left: '50%',
         top: '50%',
         width: BASE * sc,
         height: 'auto',
         transform: `translate(calc(-50% + ${state.x}px), calc(-50% + ${state.y}px))`,
-        cursor: canInteract ? (dragging.current ? 'grabbing' : 'grab') : 'default',
-        zIndex: 5,
+        cursor: isLocked ? 'default' : canInteract ? (dragging.current ? 'grabbing' : 'grab') : 'default',
+        zIndex: isLocked ? 0 : 5,
+        pointerEvents: isLocked ? 'none' : 'auto',
         userSelect: 'none',
         touchAction: 'none',
+        opacity: isLocked ? 0.85 : 1,
+        transition: 'opacity .2s, z-index 0s',
       }}
-      title={canInteract ? 'Arraste para mover · Scroll para zoom' : undefined}
+      title={isLocked ? 'Modo texto ativo — imagem bloqueada' : canInteract ? 'Arraste para mover · Scroll para zoom' : undefined}
     >
       <img
         src={src}

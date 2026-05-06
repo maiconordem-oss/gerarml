@@ -1323,7 +1323,7 @@ function AdManager({ data, productName, storeName, onLoad, setProductName, setSt
 
 
 /* ============== SlotToolbar — barra fixa acima de cada foto ============== */
-function SlotToolbar({ imgKey, slotKey, zoomKey, data, set, openCrop, rotateImg }) {
+function SlotToolbar({ imgKey, slotKey, zoomKey, data, set, openCrop, rotateImg, textMode, setTextMode }) {
   const imgSrc = data && (data[imgKey] || data.mainImg);
   const hasImg = !!imgSrc;
   const adj = (data && data[slotKey+'_adj']) || { brightness:100, contrast:100, saturation:100 };
@@ -1402,6 +1402,21 @@ function SlotToolbar({ imgKey, slotKey, zoomKey, data, set, openCrop, rotateImg 
     <div style={BAR}>
       {/* ── Linha de abas ── */}
       <div style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderBottom:'1px solid rgba(255,255,255,.08)' }}>
+        {/* Modo texto — trava o PanZoom para deixar clicar nos textos */}
+        <button
+          onClick={() => setTextMode && setTextMode(v => !v)}
+          style={{
+            padding: '5px 10px', border: 'none', borderRadius: 6,
+            background: textMode ? '#3b82f6' : 'rgba(255,255,255,.1)',
+            color: textMode ? '#fff' : 'rgba(255,255,255,.6)',
+            fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            transition: 'background .12s',
+          }}
+          title={textMode ? 'Modo texto ativo — clique para mover imagem' : 'Ativar modo texto — trava imagem para editar textos'}
+        >
+          {textMode ? '🔒 Texto' : '🔓 Imagem'}
+        </button>
+        <div style={{ width:1, height:16, background:'rgba(255,255,255,.15)' }}/>
         <button style={TAB(tab==='img')} onClick={() => setTab('img')}>📷 Imagem</button>
         <button style={TAB(tab==='adj')} onClick={() => setTab('adj')}>
           ◑ Ajustes{adjChanged ? ' •' : ''}
@@ -1561,6 +1576,7 @@ function App() {
   const [tweaksOpen, setTweaksOpen] = useTweakMode();
   const [rawFiles, setRawFiles] = React.useState([]);
   const [cropState, setCropState] = React.useState(null); // { key, src }
+  const [textMode, setTextMode] = React.useState(false); // bloqueia PanZoom ao editar texto
   const [previewOpen, setPreviewOpen] = React.useState(false);
 
   // ── Undo / Redo ──────────────────────────────────────────
@@ -1687,8 +1703,8 @@ function App() {
                 promptKeys={[1]}/>
             </div>
           </>}
-          toolbar={<SlotToolbar imgKey="p1_img" slotKey="p1" zoomKey="p1_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p1_img" slotKey="p1" zoomKey="p1_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto1 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
@@ -1698,8 +1714,8 @@ function App() {
               label="✦ Gerar produto + 2 closes" title="Produto com 2 miniaturas de close integradas"
               promptKeys={[2]}/>
           </div>}
-          toolbar={<SlotToolbar imgKey="p2_img" slotKey="p2" zoomKey="p2_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto2 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p2_img" slotKey="p2" zoomKey="p2_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto2 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
@@ -1707,8 +1723,8 @@ function App() {
             
             <span style={{fontSize:11,color:'#6b7280',fontStyle:'italic'}}>Usa foto 1 por padrão</span>
           </div>}
-          toolbar={<SlotToolbar imgKey="p3_img" slotKey="p3" zoomKey="p3_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p3_img" slotKey="p3" zoomKey="p3_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto3 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
@@ -1718,24 +1734,24 @@ function App() {
               label="✦ Gerar lifestyle" title="Produto em uso no ambiente real"
               promptKeys={[4]}/>
           </div>}
-          toolbar={<SlotToolbar imgKey="p4_img" slotKey="p4" zoomKey="p4_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto4 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p4_img" slotKey="p4" zoomKey="p4_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto4 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             
           </div>}
-          toolbar={<SlotToolbar imgKey="p5_img" slotKey="p5" zoomKey="p5_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p5_img" slotKey="p5" zoomKey="p5_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto5 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
             
           </div>}
-          toolbar={<SlotToolbar imgKey="p6_img" slotKey="p6" zoomKey="p6_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
-          <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
+          toolbar={<SlotToolbar imgKey="p6_img" slotKey="p6" zoomKey="p6_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg} textMode={textMode} setTextMode={setTextMode}/>}>
+          <MLPhoto6 data={{...data, __textMode: textMode}} set={set} bgMode={data.bg_mode}/>
         </Slot>
       </div>
 
