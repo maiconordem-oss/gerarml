@@ -305,18 +305,16 @@ function makeCircleCrops(dataUrl) {
   });
 }
 
-/* ============== Slot wrapper with scaling + floating toolbars ============== */
-function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
+/* ============== Slot wrapper ============== */
+function Slot({ num, title, children, productName, bg, extra, toolbar }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const [scale, setScale] = useState(0.4);
-  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const update = () => {
       if (!wrapRef.current) return;
-      const w = wrapRef.current.clientWidth;
-      setScale(w / 1200);
+      setScale(wrapRef.current.clientWidth / 1200);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -326,7 +324,7 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
 
   const handleExport = async () => {
     if (!canvasRef.current) return;
-    const filename = `${(productName || 'produto').replace(/\s+/g,'-').toLowerCase()}-foto-${num}.png`;
+    const filename = `${(productName||'produto').replace(/\s+/g,'-').toLowerCase()}-foto-${num}.png`;
     await MLExport(canvasRef.current, filename);
   };
 
@@ -338,23 +336,9 @@ function Slot({ num, title, children, productName, bg, extra, imgToolbar }) {
           <button onClick={handleExport} title="Baixar PNG 1200×1540">↓ PNG</button>
         </div>
       </div>
+      {toolbar && <div data-export-hide="true" style={{marginBottom:2}}>{toolbar}</div>}
       {extra && <div style={{marginBottom:6}}>{extra}</div>}
-      <div className="canvas-wrap" ref={wrapRef}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{ position: 'relative' }}
-      >
-        {imgToolbar && (
-          <div data-export-hide="true" style={{
-            position: 'absolute', top: 8, left: 8, right: 8, zIndex: 100,
-            opacity: hovered ? 1 : 0,
-            transform: hovered ? 'translateY(0)' : 'translateY(-6px)',
-            transition: 'opacity .18s ease, transform .18s ease',
-            pointerEvents: hovered ? 'auto' : 'none',
-          }}>
-            {imgToolbar}
-          </div>
-        )}
+      <div className="canvas-wrap" ref={wrapRef} style={{ position: 'relative' }}>
         <div ref={canvasRef} className="canvas" style={{ transform: `scale(${scale})`, position: 'relative' }}>
           {bg && <img src={bg} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, pointerEvents:'none' }}/>}
           <div style={{position:'relative', zIndex:1, width:'100%', height:'100%'}}>
@@ -1338,275 +1322,190 @@ function AdManager({ data, productName, storeName, onLoad, setProductName, setSt
 
 
 
-/* ============== SlotImgToolbar — toolbar flutuante sobre cada foto ============== */
-function SlotImgToolbar({ imgKey, slotKey, data, set, openCrop, rotateImg, rawFiles, slotNum, aiPromptKeys, onAiResult }) {
+/* ============== SlotToolbar — barra fixa acima de cada foto ============== */
+function SlotToolbar({ imgKey, slotKey, zoomKey, data, set, openCrop, rotateImg }) {
   const imgSrc = data && (data[imgKey] || data.mainImg);
   const hasImg = !!imgSrc;
-  const adj = data && (data[slotKey+'_adj'] || { brightness:100, contrast:100, saturation:100 });
-  const isAdjDefault = adj.brightness===100 && adj.contrast===100 && adj.saturation===100;
+  const adj = (data && data[slotKey+'_adj']) || { brightness:100, contrast:100, saturation:100 };
+  const zoom = (data && data[zoomKey]) || 1;
 
-  const [rotating, setRotating] = React.useState(false);
-  const [busy, setBusy] = React.useState(null); // 'chroma'|'smart'|'vision-bg'|'improve'|'variation'
-  const [adjOpen, setAdjOpen] = React.useState(false);
-  const [section, setSection] = React.useState('tools'); // 'tools'|'openai'|'adj'
+  const [tab, setTab]         = React.useState('img');   // 'img' | 'adj' | 'txt'
+  const [busy, setBusy]       = React.useState(null);
+  const [rotating, setRot]    = React.useState(false);
   const fileRef = React.useRef(null);
 
-  const doRotate = async (deg) => {
-    if (!hasImg || rotating) return;
-    setRotating(true);
-    try { await rotateImg(imgKey, deg); } catch(_){}
-    setRotating(false);
-  };
-
+  // ── helpers ──
   const apply = async (fn, key) => {
-    if (!imgSrc) return;
+    if (!imgSrc || busy) return;
     setBusy(key);
-    try { const out = await fn(imgSrc); set(imgKey, out); }
-    catch(err) { alert('Erro: ' + err.message); }
+    try { set(imgKey, await fn(imgSrc)); }
+    catch(e) { alert('Erro: ' + e.message); }
     setBusy(null);
   };
 
-  const handleFile = (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = (ev) => set(imgKey, ev.target.result);
-    r.readAsDataURL(file);
+  const doRotate = async (deg) => {
+    if (!hasImg || rotating) return;
+    setRot(true);
+    try { await rotateImg(imgKey, deg); } catch(_) {}
+    setRot(false);
   };
 
-  const updateAdj = (field, val) => set(slotKey+'_adj', { ...adj, [field]: val });
+  const handleFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => set(imgKey, ev.target.result);
+    r.readAsDataURL(f);
+  };
 
-  // Estilo base dos botões da toolbar
-  const tb = (active) => ({
-    display: 'flex', alignItems: 'center', gap: 4,
-    padding: '5px 9px', border: '1px solid rgba(255,255,255,.3)',
-    borderRadius: 7, background: active ? 'rgba(255,255,255,.95)' : 'rgba(20,20,20,.72)',
-    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-    color: active ? '#111' : '#fff', fontSize: 11, fontWeight: 700,
-    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+  const updAdj = (k, v) => set(slotKey+'_adj', { ...adj, [k]: v });
+  const hasOpenAI = !!(window.OPENAI_API_KEY || localStorage.getItem('openai_api_key'));
+  const adjChanged = adj.brightness!==100 || adj.contrast!==100 || adj.saturation!==100;
+
+  // ── estilos ──
+  const BAR = {
+    width: '100%', background: '#1c1c1e',
+    borderRadius: '8px 8px 0 0',
+    userSelect: 'none',
+  };
+
+  const TAB = (active) => ({
+    padding: '5px 12px', border: 'none', borderRadius: 6,
+    background: active ? 'rgba(255,255,255,.15)' : 'transparent',
+    color: active ? '#fff' : 'rgba(255,255,255,.45)',
+    fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'background .12s, color .12s',
   });
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {/* Linha principal de ferramentas */}
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+  const BTN = (highlight) => ({
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '5px 10px', border: 'none', borderRadius: 6,
+    background: highlight ? '#FFC42B' : 'rgba(255,255,255,.1)',
+    color: highlight ? '#000' : '#fff',
+    fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'background .12s',
+  });
 
-        {/* Trocar imagem */}
-        <button onClick={() => fileRef.current && fileRef.current.click()} style={tb(false)} title="Trocar imagem">
-          📷 Trocar
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
-
-        {/* Rotação */}
-        <button onClick={() => doRotate(270)} disabled={!hasImg||rotating} style={tb(false)} title="Girar ↺">↺</button>
-        <button onClick={() => doRotate(90)} disabled={!hasImg||rotating} style={tb(false)} title="Girar ↻">↻</button>
-
-        {/* Crop */}
-        <button onClick={() => hasImg && openCrop(imgKey)} disabled={!hasImg} style={tb(false)} title="Recortar">✂ Crop</button>
-
-        {/* Remover fundo local */}
-        <button onClick={() => apply(window.MLImgUtils.removeBgChroma, 'chroma')} disabled={!hasImg||!!busy} style={tb(busy==='chroma')} title="Remover fundo (cor sólida)">
-          {busy==='chroma' ? '⏳' : '✕bg'} Fundo
-        </button>
-
-        {/* Remover fundo IA local */}
-        <button onClick={() => apply(window.MLImgUtils.removeBgSmart, 'smart')} disabled={!hasImg||!!busy} style={tb(busy==='smart')} title="Remover fundo (IA local)">
-          {busy==='smart' ? '⏳' : '✦'} bg IA
-        </button>
-
-        {/* Auto-ajuste */}
-        <button onClick={() => apply(window.MLImgUtils.autoAdjust, 'adj')} disabled={!hasImg||!!busy} style={tb(busy==='adj')} title="Auto-ajuste de cor">
-          {busy==='adj' ? '⏳' : '⚡'} Auto
-        </button>
-
-        {/* Ajustes manuais */}
-        <button onClick={() => setAdjOpen(v => !v)} style={tb(adjOpen || !isAdjDefault)} title="Brilho / Contraste / Saturação">
-          ◑ Ajustes{!isAdjDefault && ' •'}
-        </button>
-
-        {/* OpenAI (se tiver key) */}
-        {(window.OPENAI_API_KEY || localStorage.getItem('openai_api_key')) && (<>
-          <button onClick={() => apply(window.MLImgUtils.removeBgVision, 'vision-bg')} disabled={!hasImg||!!busy} style={tb(busy==='vision-bg')} title="Remover fundo via GPT-4o Vision">
-            {busy==='vision-bg' ? '⏳' : '✦'} bg Vision
-          </button>
-          <button onClick={() => apply(window.MLImgUtils.improveQuality, 'improve')} disabled={!hasImg||!!busy} style={tb(busy==='improve')} title="Melhorar qualidade (gpt-image-1-mini)">
-            {busy==='improve' ? '⏳' : '✨'} Melhorar
-          </button>
-          <button onClick={() => apply(window.MLImgUtils.generateVariation, 'variation')} disabled={!hasImg||!!busy} style={tb(busy==='variation')} title="Gerar variação (gpt-image-1-mini)">
-            {busy==='variation' ? '⏳' : '🎨'} Variação
-          </button>
-        </>)}
-
-        {/* Clipboard */}
-        <button onClick={() => { if(imgSrc) window._imgClipboard = imgSrc; }} disabled={!hasImg} style={tb(false)} title="Copiar imagem">⎘ Copiar</button>
-        <button onClick={() => { if(window._imgClipboard) set(imgKey, window._imgClipboard); }} disabled={!window._imgClipboard} style={tb(false)} title="Colar imagem">⎘ Colar</button>
-      </div>
-
-      {/* Painel de ajustes deslizável */}
-      {adjOpen && (
-        <div style={{
-          background: 'rgba(20,20,20,.82)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-          borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center',
-        }}>
-          {[
-            { key:'brightness', label:'☀ Brilho', min:50, max:180 },
-            { key:'contrast',   label:'◑ Contraste', min:50, max:180 },
-            { key:'saturation', label:'◈ Saturação', min:0, max:200 },
-          ].map(({ key, label, min, max }) => (
-            <div key={key} style={{ display:'flex', alignItems:'center', gap:8, minWidth:180 }}>
-              <span style={{ fontSize:11, fontWeight:700, color:'#ccc', whiteSpace:'nowrap' }}>{label}</span>
-              <input type="range" min={min} max={max} step={1} value={adj[key]}
-                onChange={e => updateAdj(key, Number(e.target.value))}
-                style={{ flex:1, accentColor:'#FFC42B' }}/>
-              <span style={{ fontSize:10, fontFamily:'monospace', color: adj[key]!==100 ? '#FFC42B' : '#888', minWidth:32 }}>{adj[key]}%</span>
-            </div>
-          ))}
-          {!isAdjDefault && (
-            <button onClick={() => set(slotKey+'_adj', {brightness:100,contrast:100,saturation:100})}
-              style={{ fontSize:10, fontWeight:700, padding:'3px 10px', border:'1px solid #fca5a5', borderRadius:6, background:'transparent', color:'#fca5a5', cursor:'pointer' }}>
-              Reset
-            </button>
-          )}
-        </div>
-      )}
+  const SLIDER_ROW = ({ label, k, min, max }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:140 }}>
+      <span style={{ fontSize:10, color:'rgba(255,255,255,.5)', minWidth:60 }}>{label}</span>
+      <input type="range" min={min} max={max} step={1} value={adj[k]}
+        onChange={e => updAdj(k, +e.target.value)}
+        style={{ flex:1, accentColor:'#FFC42B', minWidth:80 }}/>
+      <span style={{ fontSize:10, fontFamily:'monospace', color: adj[k]!==100 ? '#FFC42B' : 'rgba(255,255,255,.3)', minWidth:32 }}>
+        {adj[k]}%
+      </span>
     </div>
   );
-}
-
-/* ============== Preview estilo Mercado Livre ============== */
-function MLPreviewModal({ data, productName, onClose }) {
-  const canvases = document.querySelectorAll('.canvas');
-  const [thumbs, setThumbs] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-
-  // Gera thumbnails capturando os canvas existentes
-  React.useEffect(() => {
-    if (!window.htmlToImage || !canvases.length) { setLoading(false); return; }
-    setLoading(true);
-    const TRANSPARENT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
-
-    Promise.all(Array.from(canvases).map(async (node) => {
-      const prev = node.style.transform;
-      node.style.transform = 'scale(1)';
-      node.style.transformOrigin = 'top left';
-      node.classList.add('exporting');
-      await new Promise(r => setTimeout(r, 40));
-      try {
-        const url = await window.htmlToImage.toPng(node, {
-          width: 1200, height: 1540, pixelRatio: 0.15,
-          imagePlaceholder: TRANSPARENT,
-        });
-        return url;
-      } catch(_) { return ''; }
-      finally {
-        node.style.transform = prev;
-        node.classList.remove('exporting');
-      }
-    })).then(urls => { setThumbs(urls); setLoading(false); });
-  }, []);
-
-  const fakePrice = 'R$ 189,90';
-  const fakeSeller = data.p5_store_name || 'Mega Distribuidor';
-  const name = productName || 'Produto';
-
-  // Simula 9 cards de listagem, foto 1 na posição 1
-  const grid = Array.from({length: 9}, (_, i) => ({ isOurs: i === 0, i }));
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.65)', zIndex:3000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', overflowY:'auto', paddingTop:40, paddingBottom:40 }}>
-      <div style={{ background:'#fff', borderRadius:16, width:'90vw', maxWidth:900, boxShadow:'0 24px 64px rgba(0,0,0,.3)', overflow:'hidden' }}>
-        {/* Header do modal */}
-        <div style={{ background:'#FFE600', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontFamily:'Montserrat', fontWeight:900, fontSize:20, color:'#333' }}>mercadolivre</span>
-            <span style={{ fontSize:12, background:'rgba(0,0,0,.12)', padding:'2px 8px', borderRadius:4, color:'#333', fontWeight:600 }}>Preview de listagem</span>
-          </div>
-          <button onClick={onClose} style={{ border:0, background:'rgba(0,0,0,.12)', borderRadius:'50%', width:32, height:32, fontSize:18, cursor:'pointer', display:'grid', placeItems:'center', color:'#333', fontWeight:700 }}>×</button>
-        </div>
+    <div style={BAR}>
+      {/* ── Linha de abas ── */}
+      <div style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderBottom:'1px solid rgba(255,255,255,.08)' }}>
+        <button style={TAB(tab==='img')} onClick={() => setTab('img')}>📷 Imagem</button>
+        <button style={TAB(tab==='adj')} onClick={() => setTab('adj')}>
+          ◑ Ajustes{adjChanged ? ' •' : ''}
+        </button>
+        <button style={TAB(tab==='txt')} onClick={() => setTab('txt')}>T Texto</button>
 
-        {/* Barra de categoria fake */}
-        <div style={{ borderBottom:'1px solid #eee', padding:'8px 20px', fontSize:12, color:'#666' }}>
-          Ferramentas · Equipamentos · {name}
+        {/* Zoom sempre visível à direita */}
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>Zoom</span>
+          <button onClick={() => set(zoomKey, Math.max(0.1, zoom - 0.1))}
+            style={{ width:22, height:22, border:'none', borderRadius:4, background:'rgba(255,255,255,.1)', color:'#fff', fontSize:13, fontWeight:900, cursor:'pointer', lineHeight:1 }}>−</button>
+          <span style={{ fontSize:11, fontFamily:'monospace', color:'#fff', minWidth:36, textAlign:'center' }}>
+            {Math.round(zoom*100)}%
+          </span>
+          <button onClick={() => set(zoomKey, Math.min(4, zoom + 0.1))}
+            style={{ width:22, height:22, border:'none', borderRadius:4, background:'rgba(255,255,255,.1)', color:'#fff', fontSize:13, fontWeight:900, cursor:'pointer', lineHeight:1 }}>+</button>
         </div>
+      </div>
 
-        <div style={{ padding:20 }}>
-          {loading && (
-            <div style={{ textAlign:'center', padding:40, color:'#999', fontSize:14 }}>
-              ⏳ Gerando thumbnails…
+      {/* ── Conteúdo da aba ── */}
+      <div style={{ padding:'7px 8px', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', minHeight:38 }}>
+
+        {/* ABA IMAGEM */}
+        {tab === 'img' && <>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
+          <button onClick={() => fileRef.current.click()} style={BTN(false)}>📷 Trocar</button>
+          <button onClick={() => doRotate(270)} disabled={!hasImg||rotating} style={BTN(false)}>↺</button>
+          <button onClick={() => doRotate(90)}  disabled={!hasImg||rotating} style={BTN(false)}>↻</button>
+          <button onClick={() => hasImg && openCrop(imgKey)} disabled={!hasImg} style={BTN(false)}>✂ Crop</button>
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+          <button onClick={() => apply(window.MLImgUtils.removeBgChroma, 'chroma')} disabled={!hasImg||!!busy} style={BTN(busy==='chroma')}>
+            {busy==='chroma' ? '⏳' : '✕'} Fundo
+          </button>
+          <button onClick={() => apply(window.MLImgUtils.removeBgSmart, 'smart')} disabled={!hasImg||!!busy} style={BTN(busy==='smart')}>
+            {busy==='smart' ? '⏳' : '✦'} Fundo IA
+          </button>
+          <button onClick={() => apply(window.MLImgUtils.autoAdjust, 'auto')} disabled={!hasImg||!!busy} style={BTN(busy==='auto')}>
+            {busy==='auto' ? '⏳' : '⚡'} Auto
+          </button>
+          {hasOpenAI && <>
+            <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+            <button onClick={() => apply(window.MLImgUtils.improveQuality, 'improve')} disabled={!hasImg||!!busy} style={BTN(busy==='improve')}>
+              {busy==='improve' ? '⏳' : '✨'} Melhorar
+            </button>
+            <button onClick={() => apply(window.MLImgUtils.generateVariation, 'var')} disabled={!hasImg||!!busy} style={BTN(busy==='var')}>
+              {busy==='var' ? '⏳' : '🎨'} Variação
+            </button>
+          </>}
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+          <button onClick={() => { if(imgSrc) window._imgClipboard = imgSrc; }} disabled={!hasImg} style={BTN(false)}>⎘ Copiar</button>
+          <button onClick={() => { if(window._imgClipboard) set(imgKey, window._imgClipboard); }} disabled={!window._imgClipboard} style={BTN(false)}>⎘ Colar</button>
+        </>}
+
+        {/* ABA AJUSTES */}
+        {tab === 'adj' && <>
+          <SLIDER_ROW label="☀ Brilho"     k="brightness" min={50} max={180}/>
+          <SLIDER_ROW label="◑ Contraste"  k="contrast"   min={50} max={180}/>
+          <SLIDER_ROW label="◈ Saturação"  k="saturation" min={0}  max={200}/>
+          {adjChanged && (
+            <button onClick={() => set(slotKey+'_adj', {brightness:100,contrast:100,saturation:100})}
+              style={{ ...BTN(false), marginLeft:4, borderColor:'#fca5a5', color:'#fca5a5' }}>
+              ↺ Reset
+            </button>
+          )}
+        </>}
+
+        {/* ABA TEXTO */}
+        {tab === 'txt' && <>
+          {['bold','italic','underline','strikeThrough'].map((cmd, i) => (
+            <button key={cmd}
+              onMouseDown={e => { e.preventDefault(); if(window.__mlFmtActive) { window.__mlFmtActive.el.focus(); document.execCommand(cmd); window.__mlFmtActive.onSave(window.__mlFmtActive.el.innerHTML); } }}
+              style={BTN(false)}
+              title={['Negrito','Itálico','Sublinhado','Riscado'][i]}>
+              {[<b>B</b>, <i>I</i>, <u>U</u>, <s>S</s>][i]}
+            </button>
+          ))}
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>Tam.</span>
+          <button
+            onMouseDown={e => { e.preventDefault(); const a=window.__mlFmtActive; if(!a) return; const sz=Math.max(8,(parseFloat(a.el.style.fontSize)||parseFloat(window.getComputedStyle(a.el).fontSize)||32)-8); a.el.style.fontSize=sz+'px'; a.onSave(a.el.innerHTML); }}
+            style={BTN(false)}>A−</button>
+          <button
+            onMouseDown={e => { e.preventDefault(); const a=window.__mlFmtActive; if(!a) return; const sz=Math.min(300,(parseFloat(a.el.style.fontSize)||parseFloat(window.getComputedStyle(a.el).fontSize)||32)+8); a.el.style.fontSize=sz+'px'; a.onSave(a.el.innerHTML); }}
+            style={BTN(false)}>A+</button>
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>Cor</span>
+          <label onMouseDown={e => e.preventDefault()} style={{ position:'relative', cursor:'pointer' }}>
+            <div style={{ width:28, height:24, borderRadius:5, border:'1px solid rgba(255,255,255,.3)', background: window.__mlFmtActive ? (window.__mlFmtActive.el.style.color||'#ffffff') : '#ffffff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#000', textShadow:'0 0 3px #fff' }}>A</span>
             </div>
-          )}
+            <input type="color" defaultValue="#ffffff"
+              onMouseDown={e => e.stopPropagation()}
+              onChange={e => { const a=window.__mlFmtActive; if(!a) return; a.el.focus(); document.execCommand('foreColor',false,e.target.value); a.onSave(a.el.innerHTML); }}
+              style={{ position:'absolute', opacity:0, inset:0, cursor:'pointer', width:'100%', height:'100%' }}/>
+          </label>
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,.15)', margin:'0 2px' }}/>
+          <button
+            onMouseDown={e => { e.preventDefault(); const a=window.__mlFmtActive; if(!a) return; a.el.focus(); document.execCommand('removeFormat'); a.onSave(a.el.innerHTML); }}
+            style={BTN(false)}>✕ fmt</button>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,.3)', marginLeft:'auto' }}>
+            {window.__mlFmtActive ? window.__mlFmtActive.el.innerText.length + 'ch' : '— clique num texto'}
+          </span>
+        </>}
 
-          {!loading && (
-            <>
-              <div style={{ fontSize:12, color:'#666', marginBottom:12 }}>
-                {grid.length} resultados para "<strong>{name}</strong>"
-              </div>
-
-              {/* Grade estilo ML */}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12 }}>
-                {grid.map(({ isOurs, i }) => (
-                  <div key={i} style={{
-                    border: isOurs ? '2px solid #3483fa' : '1px solid #eee',
-                    borderRadius:8, overflow:'hidden', background:'#fff',
-                    boxShadow: isOurs ? '0 0 0 3px rgba(52,131,250,.15)' : '0 1px 4px rgba(0,0,0,.06)',
-                    position:'relative',
-                  }}>
-                    {isOurs && (
-                      <div style={{ position:'absolute', top:6, left:6, zIndex:2, background:'#3483fa', color:'white', fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:10 }}>
-                        SEU ANÚNCIO
-                      </div>
-                    )}
-                    {/* Thumbnail */}
-                    <div style={{ aspectRatio:'1', background:'#f5f5f5', display:'grid', placeItems:'center', overflow:'hidden' }}>
-                      {isOurs && thumbs[0]
-                        ? <img src={thumbs[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-                        : <div style={{ width:'100%', height:'100%', background: i%3===0 ? '#f0f0f0' : i%3===1 ? '#e8f0fe' : '#fef3c7', display:'grid', placeItems:'center' }}>
-                            <span style={{ fontSize:28 }}>{['📦','🔧','⚙️','🛠️','🔩','🪛','🔨','🪚'][i%8]}</span>
-                          </div>
-                      }
-                    </div>
-                    {/* Info */}
-                    <div style={{ padding:'8px 10px' }}>
-                      <div style={{ fontSize:11, color:'#333', lineHeight:1.3, marginBottom:4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
-                        {isOurs ? name : ['Produto similar A','Kit Profissional','Ferramenta Esp.','Modelo Importado','Versão Standard','Conjunto Comp.','Item Técnico','Peça Original'][i%8]}
-                      </div>
-                      <div style={{ fontFamily:'Montserrat', fontWeight:800, fontSize:14, color:'#333' }}>
-                        {isOurs ? fakePrice : `R$ ${(120 + i*23).toFixed(2).replace('.',',')}`}
-                      </div>
-                      {isOurs && (
-                        <div style={{ fontSize:10, color:'#00a650', fontWeight:600, marginTop:2 }}>Frete grátis</div>
-                      )}
-                      <div style={{ fontSize:10, color:'#999', marginTop:4 }}>
-                        {isOurs ? fakeSeller : 'Vendedor '+String.fromCharCode(65+i)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Galeria das 6 fotos em mini */}
-              {thumbs.length > 0 && (
-                <div style={{ marginTop:28, borderTop:'1px solid #eee', paddingTop:20 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#333', marginBottom:12 }}>Suas 6 fotos no anúncio</div>
-                  <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                    {thumbs.map((url, idx) => url ? (
-                      <div key={idx} style={{ position:'relative' }}>
-                        <img src={url} alt={'Foto '+(idx+1)} style={{ width:100, height:128, objectFit:'cover', borderRadius:6, border: idx===0 ? '2px solid #3483fa' : '1px solid #ddd', display:'block' }}/>
-                        <div style={{ position:'absolute', bottom:4, right:4, background:'rgba(0,0,0,.6)', color:'white', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3 }}>
-                          F{idx+1}
-                        </div>
-                        {idx===0 && <div style={{ position:'absolute', top:4, left:4, background:'#3483fa', color:'white', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3 }}>CAPA</div>}
-                      </div>
-                    ) : null)}
-                  </div>
-                  <div style={{ marginTop:10, fontSize:11, color:'#666' }}>
-                    ⬆ Verifique se o texto da capa está legível em tamanho pequeno
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -1782,60 +1681,60 @@ function App() {
           extra={<>
             <VariantPicker value={data.p1_variant||'A'} onChange={(v)=>set('p1_variant',v)}/>
             <div style={{marginTop:4, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-              <ZoomBar value={data.p1_zoom||1} onChange={(v)=>set('p1_zoom',v)}/>
+              
               <AIGenBtn slotNum={1} rawImgs={rawFiles} onResult={merge}
                 label="✦ Gerar estúdio" title="Gera foto com fundo branco de estúdio"
                 promptKeys={[1]}/>
             </div>
           </>}
-          imgToolbar={<SlotImgToolbar imgKey="p1_img" slotKey="p1" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p1_img" slotKey="p1" zoomKey="p1_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto1 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={2} title="Características principais" productName={productName} bg={data.bg_mode ? data.bg_foto2 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-            <ZoomBar value={data.p2_zoom||1} onChange={(v)=>set('p2_zoom',v)}/>
+            
             <AIGenBtn slotNum={2} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar produto + 2 closes" title="Produto com 2 miniaturas de close integradas"
               promptKeys={[2]}/>
           </div>}
-          imgToolbar={<SlotImgToolbar imgKey="p2_img" slotKey="p2" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p2_img" slotKey="p2" zoomKey="p2_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto2 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={3} title="Dimensões / Especificações" productName={productName} bg={data.bg_mode ? data.bg_foto3 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-            <ZoomBar value={data.p3_zoom||1} onChange={(v)=>set('p3_zoom',v)}/>
+            
             <span style={{fontSize:11,color:'#6b7280',fontStyle:'italic'}}>Usa foto 1 por padrão</span>
           </div>}
-          imgToolbar={<SlotImgToolbar imgKey="p3_img" slotKey="p3" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p3_img" slotKey="p3" zoomKey="p3_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto3 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={4} title="Solução ideal" productName={productName} bg={data.bg_mode ? data.bg_foto4 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-            <ZoomBar value={data.p4_zoom||1} onChange={(v)=>set('p4_zoom',v)}/>
+            
             <AIGenBtn slotNum={4} rawImgs={rawFiles} onResult={merge}
               label="✦ Gerar lifestyle" title="Produto em uso no ambiente real"
               promptKeys={[4]}/>
           </div>}
-          imgToolbar={<SlotImgToolbar imgKey="p4_img" slotKey="p4" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p4_img" slotKey="p4" zoomKey="p4_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto4 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={5} title="Garantia + Avaliação" productName={productName} bg={data.bg_mode ? data.bg_foto5 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-            <ZoomBar value={data.p5_zoom||1} onChange={(v)=>set('p5_zoom',v)}/>
+            
           </div>}
-          imgToolbar={<SlotImgToolbar imgKey="p5_img" slotKey="p5" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p5_img" slotKey="p5" zoomKey="p5_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto5 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
 
         <Slot num={6} title="Garantia + MercadoLíder Gold" productName={productName} bg={data.bg_mode ? data.bg_foto6 : null}
           extra={<div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-            <ZoomBar value={data.p6_zoom||1} onChange={(v)=>set('p6_zoom',v)}/>
+            
           </div>}
-          imgToolbar={<SlotImgToolbar imgKey="p6_img" slotKey="p6" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
+          toolbar={<SlotToolbar imgKey="p6_img" slotKey="p6" zoomKey="p6_zoom" data={data} set={set} openCrop={openCrop} rotateImg={rotateImg}/>}>
           <MLPhoto6 data={data} set={set} bgMode={data.bg_mode}/>
         </Slot>
       </div>
