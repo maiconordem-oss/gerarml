@@ -356,68 +356,17 @@ function Slot({ num, title, children, productName, bg, extra, toolbar }) {
 
 /* ============== AI Text generation — Claude (Anthropic) ============== */
 async function generateTextsWithAI(productName, category, extras) {
-  // Usa API da Anthropic direto — sem necessidade de chave OpenAI do usuário
-  const key = ''; // chave injetada pelo proxy do servidor
-
-  const prompt = `Você gera textos de marketing para anúncios de Mercado Livre em PT-BR.
-Produto: "${productName}"
-Categoria: "${category || 'produto'}"
-Detalhes extras: "${extras || 'nenhum'}"
-
-Gere um JSON (APENAS o JSON, sem markdown, sem comentários) com EXATAMENTE estas chaves. Textos curtos, diretos, em português brasileiro. Use linguagem persuasiva mas técnica:
-
-{
-  "p2_f1_title": "título de 1-3 palavras com dois pontos no fim",
-  "p2_f1_text": "frase curta 6-10 palavras",
-  "p2_f2_title": "título de 1-3 palavras com dois pontos",
-  "p2_f2_text": "frase curta 6-10 palavras",
-  "p2_f3_title": "título de 1-3 palavras com dois pontos",
-  "p2_f3_text": "frase curta 6-10 palavras",
-  "p2_callout_title": "título de aplicação/uso 4-6 palavras com dois pontos",
-  "p2_callout_text": "frase 8-12 palavras explicando aplicação",
-  "p3_title_a": "primeira palavra do título principal MAIÚSCULA",
-  "p3_title_b": "segunda palavra MAIÚSCULA (highlight verde)",
-  "p3_title_c": "frase complementar 2-4 palavras MAIÚSCULAS",
-  "p3_title_pill": "valor numérico+unidade ex 900KG ou 5 ANOS",
-  "p3_f1_title": "título de fixação/montagem com dois pontos",
-  "p3_f1_text": "frase curta 6-10 palavras",
-  "p3_f2_title": "título de característica estrutural com dois pontos",
-  "p3_f2_text": "frase curta 6-10 palavras",
-  "p3_dim1": "dimensão1 ex 60cm",
-  "p3_dim2": "dimensão2 ex 10cm",
-  "p3_dim3": "dimensão3 ex 52cm",
-  "p3_callout_title": "título funcionamento com dois pontos",
-  "p3_callout_text": "frase 8-12 palavras",
-  "p4_title_a": "primeira palavra MAIÚSCULA",
-  "p4_title_b": "palavra-chave MAIÚSCULA (highlight verde)",
-  "p4_title_c": "palavra ligação MAIÚSCULA",
-  "p4_title_pill": "benefício final MAIÚSCULAS curtas",
-  "p4_b1_title": "qualificador profissional com dois pontos",
-  "p4_b1_text": "frase 6-10 palavras",
-  "p4_b2_title": "qualificador qualidade com dois pontos",
-  "p4_b2_text": "frase 6-10 palavras",
-  "p4_callout_title": "título suporte/extra com dois pontos",
-  "p4_callout_text": "frase 8-12 palavras"
-}`;
-
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  // Chama proxy seguro no servidor (Lovable AI Gateway -> GPT)
+  const resp = await fetch('/api/public/generate-texts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1200,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    body: JSON.stringify({ productName, category, extras }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Erro na geração de textos (Claude). Tente novamente.');
+    throw new Error(err.error || `Erro ${resp.status} na geração de textos`);
   }
-  const data = await resp.json();
-  const text = (data.content || []).map(b => b.text || '').join('');
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error('Resposta sem JSON válido');
-  return JSON.parse(m[0]);
+  return await resp.json();
 }
 
 /* ============== Botão de geração IA por slot com editor de prompt ============== */
